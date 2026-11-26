@@ -187,6 +187,8 @@ test('🔌 잇기: journeyMathSource가 learnedPool로 keys · make 맨 앞에�
   const st = read('js/stats.js');
   assert.ok(st.includes('🎣 낚시터·🎒 대여행·🎟️ 손님 맞이의 「배운 수학」도 켜져 있으면 6학년·중1 칸을 내지 않아요'));
   assert.ok(st.includes("'🌱 끄기 — 6학년·중1 칸도 ☀️·🎣에 다시'"));
-  assert.match(read('sw.js'), /const CACHE_VERSION = 'v439';/);
-  assert.match(read('js/version.js'), /export const APP_VERSION = 'v439';/);
+  // 판 번호 — v439 이상이고 sw와 version이 같게 (v440에서 넓힘 — 다음 판이 이 시험을 깨지 않게)
+  const swv = Number((read('sw.js').match(/const CACHE_VERSION = 'v(\d+)';/) || [])[1]);
+  const apv = Number((read('js/version.js').match(/export const APP_VERSION = 'v(\d+)';/) || [])[1]);
+  assert.ok(swv >= 439 && swv === apv, `판 ${swv} · ${apv}`);
 });

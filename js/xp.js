@@ -24,7 +24,8 @@ import {
 } from './db.js';
 import { houseOf, leftOf, houseShape, furnMax } from './house.js'; // 🏠 진우네 집 규칙 (순수)
 import { copyAvatar, wearBuyRule } from './avatar.js'; // 🧑 진우 캐릭터 (순수) · 🎒 낚시 채비 가게 옷 사기(v368)
-import { copyPlay, playRule, gameEndRule, bestOf, fastOf, recKey } from './homeplay.js'; // 🎮 일상 행동 · 미니 게임 끝(v307) · ⏱️ 가장 빠른 시간(v339) (순수)
+import { copyPlay, playRule, gameEndRule, bestOf, fastOf, recKey, playOf } from './homeplay.js'; // 🎮 일상 행동 · 미니 게임 끝(v307) · ⏱️ 가장 빠른 시간(v339) (순수)
+import { ssokProgress } from './ssokworld.js'; // 🌀 쏙쏙 여섯 땅 진행 읽기 (v440 — 순수)
 import { copyPhotos, photosOf, takePhotoRule, hangRule } from './photo.js'; // 📸 액자 사진 (v384 · 순수)
 import { copyGuest, arriveRule, guestPlayRule, guestNow as guestNowOf } from './guest.js'; // 🐾 손님 포켓몬 (v385 · 순수)
 import { moveBlocksTrip, moveStartRule, moveAnswerRule, moveSwapRule, moveEventRule, moveGiftRule, movePickRule, moveFurnRule, moveEndRule } from './moveday.js'; // 🚚 이사 대작전 (v397 — 순수)
@@ -999,9 +1000,16 @@ export function guestPlay(roomId, u) {
 export function guestHere() {
   return guestNowOf(profile, Date.now());
 }
-/** 🎮 미니 게임 한 판 끝(v307) — 💗(하루 한 번) + 최고 점수(⏱️ sec면 가장 빠른 시간도 — v339)를 한 트랜잭션에서 · 판은 시작할 때 이미 썼다(daily gamePlays) */
-export function gameEnd(roomId, u, gameId, score, sec = 0) {
-  return houseDo((p) => gameEndRule(p, roomId, u, gameId, score, Date.now(), sec));
+/**
+ * 🎮 미니 게임 한 판 끝(v307) — 💗(하루 한 번) + 최고 점수(⏱️ sec면 가장 빠른 시간도 — v339)를 한 트랜잭션에서 · 판은 시작할 때 이미 썼다(daily gamePlays)
+ * land = 🌀 쏙쏙 땅 결과(v440 — 끝까지 한 판이면 { id, v } · 그 밖은 null) — 진행 열쇠도 같은 트랜잭션에서
+ */
+export function gameEnd(roomId, u, gameId, score, sec = 0, land = null) {
+  return houseDo((p) => gameEndRule(p, roomId, u, gameId, score, Date.now(), sec, land));
+}
+/** 🌀 쏙쏙 땅마다 진행 { 땅 id: 0 · 1 끝까지 · 2 🏅 } (v440 — 게임 카드 🆕 · 이번 판 땅 고르기용 · 지금 프로필) */
+export function ssokLandsNow() {
+  return ssokProgress(playOf(profile && profile.homePlay).best);
 }
 /** 🎮 그 게임의 최고 점수 (게임기 화면용 — 지금 프로필 · v351부터 새 난이도 기록) */
 export function gameBest(gameId) {

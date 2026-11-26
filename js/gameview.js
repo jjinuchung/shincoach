@@ -21,13 +21,14 @@ import { runFish, FISH } from './gamefish.js'; // 🎣 잉어킹 낚시 (v344)
 import { runSort, sortReady, SORT_FEW } from './gamesort.js'; // 🔀 타입 나누기 (v345)
 import { runDiff } from './gamediff.js'; // 🔍 우리 집 다른 그림 찾기 (v345)
 import { runSimon, simonPick, SIMON_PADS, STAND_IN } from './gamesimon.js'; // 🧠 포켓몬 따라 하기 (v346)
-import { runSsok, SSOK_ART, ssokFriendPick } from './gamessok.js'; // 🌀 쏙쏙! 파트너 모험 (v373)
+import { runSsok, SSOK_ART, ssokFriendPick, FRIEND_MAX } from './gamessok.js'; // 🌀 쏙쏙! 파트너 모험 (v373)
+import { ssokWorld, ssokPickLand, ssokTurn, ssokFresh, ssokDayDelta, ssokEndLine } from './ssokworld.js'; // 🌀 쏙쏙 여섯 땅 (v440 · 순수)
 import { MON_TYPES } from './montypes.js'; // 🔀 타입 (대여행 때 PokeAPI에서 받은 표 · 순수)
 import { PAINT_BASE, paintById } from './house.js'; // 🔍 진우 방 벽지·바닥 색 (순수)
 import { animUrl, ensureAnim } from './sprite.js';
 import { SUBJECTS, FIELD, KO, status, currentSubject, clockDay, ensureToday, flushTime, adoptDaily, todayDaily, isReady, limitConf, usedSec } from './timelimit.js';
 import { claimDailyCount, releaseDailyCount, applyDailyDelta } from './db.js';
-import { gameEnd, gameBest, gameFast, gameEasyBest, gameEasyFast, itemCount, ownedMonIds, getPartner, houseNow, houseShapeNow } from './xp.js';
+import { gameEnd, gameBest, gameFast, gameEasyBest, gameEasyFast, itemCount, ownedMonIds, getPartner, houseNow, houseShapeNow, ssokLandsNow } from './xp.js';
 import { ROSTER, ensureArt, ensureCast, artUrl, characterUrl, fullArt } from './pokemon.js';
 import { typeOf, movesOf } from './battle.js';
 import { sfx, unlock } from './sfx.js';
@@ -256,6 +257,7 @@ function renderPick() {
     const rec = recordText(g);
     if (rec.best) txt.appendChild(el('span', 'gm-game-best', rec.best));
     if (rec.easy) txt.appendChild(el('span', 'gm-game-easy', rec.easy)); // 쉬울 때 기록은 따로 작게 (v351 · 🔍 Codex 156차)
+    if (g.id === 'ssok') { const fresh = ssokFresh(ssokLandsNow()); if (fresh) txt.appendChild(el('span', 'gm-game-new', fresh)); } // 🌀 안 가 본 땅이 열려 있을 때만 「🆕 🌊」 (v440 · 셈 글 없이)
     card.appendChild(txt);
     card.addEventListener('click', () => { startRound(g.id).catch(() => {}); });
     list.appendChild(card);
@@ -284,11 +286,16 @@ export function recordText(g) {
   return { best: best > 0 ? `최고 ⭐ ${best}` : '', easy: easy > 0 ? `쉬울 때 ⭐ ${easy}` : '' };
 }
 
-/** 🌀 쏙쏙 준비 — 이번 판 🔒 우리 속 친구 셋을 고르고 그림을 미리 받는다(못 받으면 🐾 — 판은 그대로) · 도감과는 상관없다 */
+/**
+ * 🌀 쏙쏙 준비 — 이번 판 🔒 우리 속 친구 셋을 고르고 그림을 미리 받는다(못 받으면 🐾 — 판은 그대로) · 도감과는 상관없다
+ * 🌀 이번 판 땅 (v440 — 판을 쓰기 전) — 안 가 본 열린 땅 먼저 · 다 가 봤으면 날짜 + 오늘 쓴 게임 판 수로 돌아가며(새로 저장하지 않는다) ·
+ *   친구는 그 땅 타입을 먼저(바다 = 물) · world는 run에 { ...prep }으로 실려 간다
+ */
 async function ssokPrep() {
-  const friends = ssokFriendPick(Math.random);
+  const W = ssokWorld(ssokPickLand(ssokLandsNow(), ssokTurn(clockDay(), Number((todayDaily() || {}).gamePlays) || 0)));
+  const friends = ssokFriendPick(Math.random, FRIEND_MAX, W.friendIds);
   const art = await artFor([SSOK_ART.volt, SSOK_ART.bird, ...friends.map((f) => f.id)]);
-  return { art, friends: friends.map((f) => ({ ...f, art: art[f.id] || null })) };
+  return { art, friends: friends.map((f) => ({ ...f, art: art[f.id] || null })), world: W.id };
 }
 
 /** 그림 미리 받기 — ART_WAIT_MS까지만 기다리고, 그때까지 받은 것만 쓴다 */
@@ -531,9 +538,15 @@ async function startRound(id) {
     sum.played += 1;
     sum.score = Math.max(sum.score, res.score); // 방 장면엔 이번에 가장 잘한 판 (도중에 그만둔 마지막 판이 아니라)
     let end = null;
-    try { end = await gameEnd(ctx.roomId, ctx.u, id, res.score, g.clock ? res.sec || 0 : 0); } catch { end = null; } // ⏱️ 다 맞춘 시간 (v339 — 그만둔 판은 sec 없음)
+    try { end = await gameEnd(ctx.roomId, ctx.u, id, res.score, g.clock ? res.sec || 0 : 0, res.land || null); } catch { end = null; } // ⏱️ 다 맞춘 시간 (v339 — 그만둔 판은 sec 없음) · 🌀 쏙쏙 땅 결과 (v440 — 다른 게임은 null)
     if (end && end.ok) sum.r = { ...end, heart: !!(end.heart || (sum.r && sum.r.heart)) };
     else sum.why = (end && end.why) || 'save';
+    if (id === 'ssok' && !(end && end.ok)) res.line = ''; // 🌀 저장 안 된 판(드묾 — 게임기를 다른 창에서 치움·저장 실패)엔 🏅·열림 줄을 안 보인다(최고 기록 줄과 같게)
+    if (id === 'ssok' && end && end.ok) { // 🌀 쏙쏙 (v440) — 끝까지 한 판만 📤 하루 기록에(판을 쓴 날 · 진행이 저장된 판만) · 이 판으로 새로 열린 땅은 끝 화면 한 줄에
+      const dd = ssokDayDelta(res.land);
+      if (dd) { try { const d = await applyDailyDelta(day, dd); if (d) adoptDaily(d); } catch { /* 📤 한 판만 빠진다 */ } }
+      if (end.land && end.land.opened) res.line = ssokEndLine(res.world, res.win, end.land.opened);
+    }
     if (!live()) return;
     ui.busy = false;
     renderResult(g, res, end);

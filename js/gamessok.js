@@ -22,6 +22,7 @@ import { musicMode } from './gamesong.js';
 import { ART as RUN_ART } from './gamerun.js';
 import { FALLBACK as DIG_FALLBACK } from './gamedig.js';
 import { ADV_W, ADV_H, GROUND, ME, ADV_ART, ART as ADV_DRAW } from './gameadv.js';
+import { ssokWorld, ssokEndLine } from './ssokworld.js'; // 🌀 여섯 땅 (v440) — 땅 표(순수) · 땅을 안 넘기면 🌿 풀밭 = v373 판 그대로
 
 /** 한 판 길이(초) — 길 약 40초 + 🤖 보스 20초 (게임 목록에 적는 값 · 끝은 보스) */
 export const SSOK_SEC = 60;
@@ -111,6 +112,8 @@ export const BALL_V = 34;
  * 🤖 보스 — 체력 칸 · 싸우는 시간(ms) · ⭐ 별 한 방(칸) · 기술 한 방(칸) · 이기면 ⭐ · 남은 이만큼(ms)마다 ⭐1 더 · 굴리는 사이(ms) · 첫 굴리기(ms) ·
  * 굴러오는 빠르기 · 크기 · 셋째마다 ⚡ 찌리리공(못 빨아들인다 — 폴짝·둥실로 넘는다) · 깎은 칸마다 ⭐1
  * 능력 없이 별만으로: 볼트 다섯을 되뱉으면 이긴다(12초쯤) · 🔥 불꽃이면 7초쯤 — 시험이 둘 다 풀어 본다
+ * 🌀 여섯 땅(v440): 🌿 풀밭 보스 = 이 수치 그대로 · 다른 땅은 ssokworld 땅 표의 boss로 덧씌워 길(stage.boss)에 싣는다 —
+ *   s.boss는 싸움터에 들어선 뒤의 보스 상태라(그 전엔 null) 수치는 늘 s.stage.boss에서 읽는다(bossOf)
  */
 export const BOSS = { hp: 10, ms: 20000, star: 2, move: 1, win: 10, bonusMs: 5000, every: 1500, first: 1200, roll: 20, w: 20, h: 22, ballEvery: 3 };
 /** 싸움터 — 넓이(한 화면) · 보스 자리(싸움터 왼쪽 끝에서 칸) · 나는 싸움터 왼쪽 끝에서 ME.screen칸에 선다 */
@@ -161,30 +164,47 @@ export const CHUNKS = [
   { id: 'cage', lv: 0, forced: true, len: 56, make: (c) => { c.mecha(12, 8, 16); c.cage(40); } },
   // 🔴 3초에 102칸 — 짧게 두어 다음 조각(우리 · 덤불·금 간 바위)까지 굴러간다(84칸일 때는 1칸 모자랐고, 바람 끝에서 빨아들이면 머금는 자리가 6칸쯤 뒤가 된다)
   { id: 'mball', lv: 1, forced: true, len: 52, make: (c) => { c.mball(6); c.mecha(20, 16, 24); c.mecha(34, 30, 38); c.volt(44); } },
+  // 🌊 바다 조각 (v440) — world = 그 땅에서만 나온다(풀밭 길 고르기에서 빠져 풀밭 판이 v373 그대로) · 지금 maker로만 짠다 · rng를 쓰지 않는다
+  //   잔교 = 바닷물 구덩이 위에 땅 높이 판자(solid 높이 0 — 판자 사이 틈은 몸보다 좁아 걸어서 건넌다 · 화면은 나무 말뚝으로) ·
+  //   징검다리 = 작은 바닷물 구덩이 셋(10칸 — 발 너비 7칸보다 넓어야 빠진다 · 톡 폴짝이면 넘는다) 위에 열매 줄(폴짝·둥실로 줄줄이 · 빠지면 피죤) ·
+  //   섬은 9칸(빠진 자리가 앞 구덩이 끝+ME.w 안이면 구조가 앞 구덩이 건너편 = 같은 섬으로 되돌려 고리가 된다 — 5.5칸보다 넓게)
+  { id: 'pier', lv: 0, world: 'sea', len: 56, make: (c) => { c.pit(8, 48); for (const dx of [8, 21, 34]) c.solid(dx, 9, 0); for (const dx of [12, 25, 38]) c.item('berry', dx, GROUND + 2); c.mecha(30, 22, 40); } },
+  { id: 'stones', lv: 1, world: 'sea', len: 70, make: (c) => { for (const a of [8, 27, 46]) { c.pit(a, a + 10); c.item('berry', a + 2, GROUND + 12); } } },
 ];
 /** 조각 차례의 어려움 — 처음 셋은 쉬운 것 · 다섯째까지 보통 · 그 뒤 어려운 것도 */
 export function chunkLevel(i) {
   return i < 3 ? 0 : i < 5 ? 1 : 2;
 }
 
-/** 🤝 이번 판 친구 셋 (순수) — FRIENDS에서 겹치지 않게 k마리 */
-export function ssokFriendPick(rng = Math.random, k = FRIEND_MAX) {
-  const pool = FRIENDS.slice();
+/**
+ * 🤝 이번 판 친구 셋 (순수) — FRIENDS에서 겹치지 않게 k마리
+ * prefer = 먼저 고를 포켓몬 id(🌀 그 땅 타입 — 바다 = 물 · v440) — 그 가운데서 먼저, 모자라면 나머지에서 · 없으면 v373 그대로(rng도 같은 수만큼)
+ */
+export function ssokFriendPick(rng = Math.random, k = FRIEND_MAX, prefer = null) {
+  const like = Array.isArray(prefer) && prefer.length ? FRIENDS.filter((f) => prefer.includes(f.id)) : [];
+  const pools = like.length ? [like, FRIENDS.filter((f) => !prefer.includes(f.id))] : [FRIENDS.slice()];
   const out = [];
-  while (out.length < k && pool.length) {
-    const r = Number(rng());
-    out.push(pool.splice(Math.min(pool.length - 1, Math.max(0, Math.floor((r >= 0 && r < 1 ? r : 0) * pool.length))), 1)[0]);
+  for (const pool of pools) {
+    while (out.length < k && pool.length) {
+      const r = Number(rng());
+      out.push(pool.splice(Math.min(pool.length - 1, Math.max(0, Math.floor((r >= 0 && r < 1 ? r : 0) * pool.length))), 1)[0]);
+    }
   }
   return out;
 }
 
 /**
- * 길 하나 만들기 (순수) → { len, arenaX, pits, ground, solids, blocks, fruits, mechas, drones, volts, chunks, seq }
+ * 길 하나 만들기 (순수) → { len, arenaX, pits, ground, solids, blocks, fruits, mechas, drones, volts, cages, mballs, chunks, seq, world, boss }
  * 처음 평지 → 조각 열(둘째는 늘 능력 메카 조각 · 같은 조각이 잇달아 나오지 않게 · 그 어려움의 조각을 두 배로) → 평지 → 🤖 싸움터
  * ids를 주면 그 조각들로만(시험이 조각 하나씩 볼 때)
+ * world = 🌀 땅 id(v440) — 없거나 모르면 🌿 풀밭(조각 고르기·rng 쓰는 수까지 v373과 같다 — 시험이 씨앗 400개로 대조) ·
+ *   다른 땅: 그 땅 조각(world)도 고르는 자리에 넣고 두 배 더 자주 · 정해 둔 자리 덧씌움(forced) · stage.boss = BOSS + 땅 보스 덧씌움 + 굉장(sup)
  */
-export function ssokStage(rng = Math.random, ids = null) {
-  const st = { len: 0, arenaX: 0, pits: [], ground: [], solids: [], blocks: [], fruits: [], mechas: [], drones: [], volts: [], cages: [], mballs: [], chunks: [], seq: 0 };
+export function ssokStage(rng = Math.random, ids = null, world = null) {
+  const W = ssokWorld(world);
+  const st = { len: 0, arenaX: 0, pits: [], ground: [], solids: [], blocks: [], fruits: [], mechas: [], drones: [], volts: [], cages: [], mballs: [], chunks: [], seq: 0, world: W.id, boss: { ...BOSS, ...(W.boss || {}), sup: [...W.sup] } };
+  const forced = W.forced ? { ...FORCED, ...W.forced } : FORCED;
+  const here = (c) => !c.world || c.world === W.id; // 그 땅에서 나오는 조각 — 땅 표시가 없는 조각은 모든 땅
   const maker = (x0) => ({
     item: (kind, dx, y) => { const k = SSOK_KINDS[kind]; st.fruits.push({ n: ++st.seq, kind, x: x0 + dx, y, w: k.w, h: k.h }); },
     solid: (dx, w, h) => { st.solids.push({ n: ++st.seq, x: x0 + dx, w, top: GROUND + h }); },
@@ -203,9 +223,9 @@ export function ssokStage(rng = Math.random, ids = null) {
     let ch = order && order[i];
     if (!ch) {
       const lv = chunkLevel(i);
-      const f = FORCED[i];
-      const pool = f === 'ab' ? CHUNKS.filter((c) => c.ab) : f ? CHUNKS.filter((c) => c.id === f) : CHUNKS.filter((c) => !c.forced && c.lv <= lv && c.id !== prev);
-      const weighted = f ? pool : pool.flatMap((c) => (c.lv === lv ? [c, c] : [c]));
+      const f = forced[i];
+      const pool = f === 'ab' ? CHUNKS.filter((c) => c.ab && here(c)) : f ? CHUNKS.filter((c) => c.id === f) : CHUNKS.filter((c) => !c.forced && here(c) && c.lv <= lv && c.id !== prev);
+      const weighted = f ? pool : pool.flatMap((c) => Array((c.lv === lv ? 2 : 1) * (c.world ? 2 : 1)).fill(c));
       const r = Number(rng());
       ch = weighted[Math.min(weighted.length - 1, Math.max(0, Math.floor((r >= 0 && r < 1 ? r : 0) * weighted.length)))];
     }
@@ -226,9 +246,9 @@ export function ssokStage(rng = Math.random, ids = null) {
   return st;
 }
 
-/** 새 판 (순수) — now = 시작 시각(ms) · 길은 rng로 한 번 만든다 (ids — 시험용 조각 차례) */
-export function ssokStart(now, rng = Math.random, ids = null) {
-  const stage = ssokStage(rng, ids);
+/** 새 판 (순수) — now = 시작 시각(ms) · 길은 rng로 한 번 만든다 (ids — 시험용 조각 차례 · world — 🌀 땅 id, 없으면 풀밭) */
+export function ssokStart(now, rng = Math.random, ids = null, world = null) {
+  const stage = ssokStage(rng, ids, world);
   return {
     t0: now, last: now, end: now + MAX_MS, stage, seq: stage.seq,
     x: START_X, y: GROUND, vy: 0, onGround: true,
@@ -253,6 +273,9 @@ export function ssokStart(now, rng = Math.random, ids = null) {
 export function ssokCam(s) {
   return Math.max(0, Math.min(s.stage.arenaX, s.x - ME.screen));
 }
+
+/** 🤖 이 판 보스 수치 — 길(stage.boss · v440)에 실린 것 · 시험이 손으로 만든 길엔 없을 수 있어 BOSS로 */
+const bossOf = (s) => (s && s.stage && s.stage.boss) || BOSS;
 
 /** 🎵 음악이 서두를 때 (순수) — 🤖 보스와 싸우는 동안 */
 export function ssokHurry(s) {
@@ -326,21 +349,26 @@ function defeat(s, list, o, by, ev) {
  * 🤖 보스에 한 방 — 깎은 칸마다 ⭐1(바로 보이게) · 다 깎으면 이김: 보스 몫이 모두 ⭐10 + 남은 5초마다 1이 되게 모자란 만큼만 더한다
  * (깎은 ⭐에 ⭐10을 또 얹어 이긴 판이 ⭐20+였다 — 기본안은 「이기면 ⭐10 · 못 이기면 깎은 만큼」 · 🔍 Codex 177차 P1)
  * ev.won = 보스 몫 전체(⭐10+) · ev.wonAdd = 이길 때 더한 것(빨리 이긴 덤)
+ * by = 맞힌 능력 id(🔥 fire · ⚡ elec · 🪨 rock — ⭐ 별·친구 박치기는 null) · 🌀 땅 보스 타입에 맞는 능력이면(stage.boss.sup) ×2 +
+ *   ev.great 「효과가 굉장했다!」(v440 — 더하기만 · ×½·×0 없음 · 굉장은 깎은 칸이 아니라 맞힌 능력으로 가른다: 마지막 한 칸도 굉장)
  */
-function bossHit(s, t, dmg, ev) {
+function bossHit(s, t, dmg, ev, by = null) {
   const b = s.boss;
   if (!b || s.done) return;
-  const d = Math.min(b.hp, dmg);
+  const B = bossOf(s);
+  const great = !!by && Array.isArray(B.sup) && B.sup.includes(by);
+  const d = Math.min(b.hp, great ? dmg * 2 : dmg);
   b.hp -= d;
   b.hitAt = t;
   s.bossDmg += d;
   s.score += d;
   ev.bossHit.push(d);
+  if (great) (ev.great || (ev.great = [])).push({ d, by });
   if (b.hp <= 0) {
     s.win = true;
     s.done = true;
     s.doneAt = t;
-    s.bossPts = BOSS.win + Math.floor(Math.max(0, b.until - t) / BOSS.bonusMs);
+    s.bossPts = B.win + Math.floor(Math.max(0, b.until - t) / B.bonusMs);
     const add = Math.max(0, s.bossPts - s.bossDmg);
     s.score += add;
     ev.won = s.bossPts;
@@ -394,7 +422,7 @@ function zapNow(s, t, ev) {
   const bossFirst = b && !s.done && b.x <= x0 + ZAP_RANGE && (!best || b.x < best.o.x);
   if (bossFirst) {
     s.zap = { x: b.x + b.w / 2, y: b.y + b.h * 0.7, t };
-    bossHit(s, t, BOSS.move, ev);
+    bossHit(s, t, bossOf(s).move, ev, 'elec');
   } else if (best) {
     s.zap = { x: best.o.x + best.o.w / 2, y: best.o.y + best.o.h / 2, t };
     if (best.list === s.cages) openCage(s, best.o, 'zap', ev); else defeat(s, best.list, best.o, 'zap', ev);
@@ -465,7 +493,7 @@ function moveShots(s, t, dt, ev) {
     //   🔥 불꽃탄·🪨 바위는 부수며 지나간다(능력이 있으면 빨아들일 수 없으니 막을 길이 있어야)
     if (!gone && sh.kind !== 'star') for (const r of s.rollers.filter((x) => !x.pull && hit(x))) defeat(s, s.rollers, r, sh.kind, ev);
     if (!gone && s.boss && !s.done && hit(s.boss)) {
-      bossHit(s, t, sh.kind === 'star' ? BOSS.star : BOSS.move, ev);
+      bossHit(s, t, sh.kind === 'star' ? bossOf(s).star : bossOf(s).move, ev, sh.kind === 'star' ? null : sh.kind); // 🔥 fire · 🪨 rock = 능력 id
       gone = true;
     }
     if (!gone && sh.x - sh.from > SHOT_RANGE) { gone = true; ev.fizz.push(sh); }
@@ -478,12 +506,13 @@ function bossStep(s, t, dt, ev) {
   const b = s.boss;
   if (!b) return;
   if (t >= b.nextAt) {
-    const kind = b.seq % BOSS.ballEvery === BOSS.ballEvery - 1 ? 'ball' : 'bolt';
+    const B = bossOf(s);
+    const kind = b.seq % B.ballEvery === B.ballEvery - 1 ? 'ball' : 'bolt';
     const k = SSOK_KINDS[kind];
-    const r = { n: ++s.seq, kind, x: b.x - k.w, y: GROUND, w: k.w, h: k.h, vx: -BOSS.roll, pull: false };
+    const r = { n: ++s.seq, kind, x: b.x - k.w, y: GROUND, w: k.w, h: k.h, vx: -B.roll, pull: false };
     s.rollers.push(r);
     b.seq += 1;
-    b.nextAt += BOSS.every;
+    b.nextAt += B.every;
     ev.thrown.push(r);
   }
   for (let i = s.rollers.length - 1; i >= 0; i--) {
@@ -627,7 +656,8 @@ function step(s, t, dt, ev) {
     if (s.x >= s.stage.arenaX + ME.screen - EPS) {
       // 🤝 구한 친구마다 한 번 몸통박치기 — 정해 둔 때(처음 2.5초 · 3.5초 사이)
       const helps = s.freed.slice(0, FRIEND_MAX).map((fi, k) => ({ fi, k, at: t + FRIEND_HELP.first + k * FRIEND_HELP.gap, done: false }));
-      const b = { hp: BOSS.hp, x: s.stage.arenaX + ARENA.bossX, y: GROUND, w: BOSS.w, h: BOSS.h, t0: t, until: t + BOSS.ms, nextAt: t + BOSS.first, seq: 0, hitAt: 0, helps };
+      const B = bossOf(s); // 🌀 땅 보스 수치 (v440 — 풀밭 = BOSS) · max = 처음 체력(체력 막대)
+      const b = { hp: B.hp, max: B.hp, x: s.stage.arenaX + ARENA.bossX, y: GROUND, w: B.w, h: B.h, t0: t, until: t + B.ms, nextAt: t + B.first, seq: 0, hitAt: 0, helps };
       s.boss = b;
       if (s.rollUntil) { s.rollUntil = 0; ev.mouthfulEnd = true; } // 싸움터에서는 몬스터볼을 내려놓는다
       ev.boss = true;
@@ -769,11 +799,12 @@ function step(s, t, dt, ev) {
  * 시계 (순수) — 지난번부터 now까지 16ms씩 나눠 움직인다 · 보스를 이기거나 보스가 도망가면 멈춘다
  * → { got, pulling, mouthed, ability, regained, lost, lostGone, dropped, spat, move, zap, rocked, killed, opened, hurt, spilled, rolled,
  *     thrown, rolledOff, shotGone, fizz, bossHit, boss, won(⭐|0), fled, rescued, helped, puffed, jumped, thud,
- *     freed(🔒 우리를 엶 { c, fi, pts, by }), friendHit(🤝 { fi, k }), mouthful(🔴 머금음), mouthfulEnd }
+ *     freed(🔒 우리를 엶 { c, fi, pts, by }), friendHit(🤝 { fi, k }), mouthful(🔴 머금음), mouthfulEnd,
+ *     great(💥 { d, by } 땅 보스 타입에 맞는 능력 — 「효과가 굉장했다!」 · v440) }
  */
 export function ssokTick(s, now) {
   const ev = {
-    freed: [], friendHit: [], mouthful: false, mouthfulEnd: false,
+    freed: [], friendHit: [], mouthful: false, mouthfulEnd: false, great: [],
     got: [], pulling: [], mouthed: [], ability: [], regained: null, lost: null, lostGone: false, dropped: false, spat: false, move: null, zap: null, rocked: false,
     killed: [], opened: [], hurt: [], spilled: false, rolled: [], thrown: [], rolledOff: [], shotGone: [], fizz: [], bossHit: [], boss: false, won: 0, wonAdd: 0, fled: false, ring: false,
     rescued: false, helped: false, puffed: false, jumped: false, thud: false,
@@ -883,6 +914,21 @@ const PAL_ATK_MS = 700;
 /** 🔒 로켓단 우리의 창살(친구 그림 위에 겹친다) · 🔴 큰 몬스터볼 */
 const CAGE_SVG = '<svg viewBox="0 0 40 50" preserveAspectRatio="none" aria-hidden="true"><rect x="1.5" y="1.5" width="37" height="47" rx="4" fill="none" stroke="#495057" stroke-width="3"/><path d="M10 2v46M20 2v46M30 2v46" stroke="#495057" stroke-width="2.6"/><rect x="1.5" y="1.5" width="37" height="7" fill="#868e96"/><circle cx="20" cy="30" r="5" fill="#e8413b" stroke="#fff" stroke-width="1.5"/><text x="20" y="32.6" font-size="7" font-weight="900" text-anchor="middle" fill="#fff" font-family="sans-serif">R</text></svg>';
 const MBALL_SVG = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="#fff" stroke="#212529" stroke-width="3"/><path d="M2 20a18 18 0 0 1 36 0z" fill="#e8413b" stroke="#212529" stroke-width="3"/><rect x="2" y="18" width="36" height="4" fill="#212529"/><circle cx="20" cy="20" r="6" fill="#fff" stroke="#212529" stroke-width="3"/></svg>';
+/**
+ * 🌀 땅 옷 (v440 · 시안 「이대로」) — 크기·움직임은 그대로 옷만(코드 그림 · 그림 파일 0장) · 없는 칸은 풀밭 그림
+ * mecha 메카 · drone 드론 · bush 🔥로 태우는 것(덤불 자리) · bolt 보스가 굴리는 작은 것(빨아들임) · ball 셋째마다 큰 것(못 빨아들임) · boss 보스
+ * 🌊 바다 = 잠수 헬멧 메카 · R 보트 드론 · 잔교 말뚝 · 작은 R 깡통 · 큰 R 부표 · 🚢 로켓단 잠수함 (고래·로봇 가재·게·야자나무 꼴은 쓰지 않는다)
+ */
+const WORLD_ART = {
+  sea: {
+    mecha: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="4" y="12" width="32" height="20" rx="6" fill="#9fb3c8" stroke="#495057" stroke-width="2.5"/><circle cx="20" cy="14" r="11" fill="#c9a227" stroke="#7a5c00" stroke-width="2"/><circle cx="20" cy="14" r="7.5" fill="#d0ebff" stroke="#7a5c00" stroke-width="1.5"/><circle cx="17" cy="14.5" r="1.9" fill="#f59f00"/><circle cx="23" cy="14.5" r="1.9" fill="#f59f00"/><circle cx="10.5" cy="9" r="1.2" fill="#7a5c00"/><circle cx="29.5" cy="9" r="1.2" fill="#7a5c00"/><circle cx="20" cy="3.6" r="1.2" fill="#7a5c00"/><circle cx="30" cy="27" r="5" fill="#e8413b" stroke="#fff" stroke-width="1.5"/><text x="30" y="30" font-size="7" font-weight="900" text-anchor="middle" fill="#fff" font-family="sans-serif">R</text><circle cx="11" cy="35" r="4.5" fill="#495057"/><circle cx="29" cy="35" r="4.5" fill="#495057"/></svg>',
+    drone: '<svg viewBox="0 0 40 25" aria-hidden="true"><path d="M2 12h36l-6 9H8z" fill="#495057" stroke="#212529" stroke-width="1.8" stroke-linejoin="round"/><rect x="3" y="12" width="34" height="3" fill="#e8413b"/><rect x="14" y="4" width="14" height="8" rx="2" fill="#adb5bd" stroke="#495057" stroke-width="1.6"/><rect x="17" y="6" width="8" height="3" rx="1" fill="#74c0fc"/><circle cx="30" cy="17.5" r="2.8" fill="#e8413b" stroke="#fff" stroke-width="1"/><text x="30" y="19" font-size="4" font-weight="900" text-anchor="middle" fill="#fff" font-family="sans-serif">R</text><path d="M0 24q3-2.4 6 0t6 0M28 24q3-2.4 6 0t6 0" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg>',
+    bush: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="10" y="6" width="20" height="33" rx="3" fill="#a0673a" stroke="#5c3d1e" stroke-width="2.5"/><ellipse cx="20" cy="6.5" rx="10" ry="3.5" fill="#c08552" stroke="#5c3d1e" stroke-width="2"/><path d="M10 17q10 5 20 0M10 26q10 5 20 0" fill="none" stroke="#e9c46a" stroke-width="2.4"/></svg>',
+    bolt: '<svg viewBox="0 0 40 40" aria-hidden="true"><rect x="7" y="4" width="26" height="32" rx="5" fill="#ced4da" stroke="#495057" stroke-width="2.5"/><rect x="7" y="14" width="26" height="12" fill="#e8413b"/><text x="20" y="24" font-size="10" font-weight="900" text-anchor="middle" fill="#fff" font-family="sans-serif">R</text></svg>',
+    ball: '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="#fff" stroke="#495057" stroke-width="2.5"/><path d="M4 12h32a18 18 0 0 0-32 0zM2.5 24h35a18 18 0 0 1-2 6H4.5a18 18 0 0 1-2-6z" fill="#e8413b"/><circle cx="20" cy="18" r="6" fill="#e8413b" stroke="#fff" stroke-width="1.6"/><text x="20" y="21" font-size="8" font-weight="900" text-anchor="middle" fill="#fff" font-family="sans-serif">R</text></svg>',
+    boss: '<svg viewBox="0 0 80 88" aria-hidden="true"><path d="M47 18V6h-8" fill="none" stroke="#495057" stroke-width="3" stroke-linejoin="round"/><rect x="34" y="3" width="6" height="6" rx="1" fill="#212529"/><path d="M32 46V26a6 6 0 0 1 6-6h14a6 6 0 0 1 6 6v20z" fill="#868e96" stroke="#343a40" stroke-width="3"/><rect x="36" y="26" width="18" height="9" rx="3" fill="#212529"/><circle cx="41" cy="30.5" r="2.6" fill="#ff6b6b"/><circle cx="49" cy="30.5" r="2.6" fill="#ff6b6b"/><path d="M2 60c0-10 10-16 22-16h40c8 0 14 6 14 16s-6 16-14 16H24C12 76 2 70 2 60z" fill="#868e96" stroke="#343a40" stroke-width="3"/><rect x="8" y="57" width="68" height="5" fill="#e8413b"/><circle cx="21" cy="51" r="3.2" fill="#ffd43b" stroke="#495057" stroke-width="1.5"/><circle cx="31" cy="51" r="3.2" fill="#ffd43b" stroke="#495057" stroke-width="1.5"/><circle cx="7" cy="64" r="3.6" fill="#343a40"/><circle cx="60" cy="64" r="8" fill="#e8413b" stroke="#fff" stroke-width="2.5"/><text x="60" y="68.3" font-size="12" font-weight="900" text-anchor="middle" fill="#fff" font-family="sans-serif">R</text><path d="M78 52v16" stroke="#495057" stroke-width="3.5" stroke-linecap="round"/><path d="M0 76q5-4 10 0t10 0t10 0t10 0t10 0t10 0t10 0t10 0V88H0z" fill="#1c7ed6"/><path d="M0 76q5-4 10 0t10 0t10 0t10 0t10 0t10 0t10 0t10 0" fill="none" stroke="#d0ebff" stroke-width="2"/></svg>',
+  },
+};
 
 /** 능력 그림(HTML) — 🔥·⚡는 그림 글자 · 바위는 코드로 그린 돌(옛 기기 글꼴에 🪨가 없을 수 있다) · 떠오르는 글에는 abName */
 const abIcon = (ab) => (ab === 'rock' ? `<span class="gs-ico">${ART.rock}</span>` : ABILITIES[ab].emoji);
@@ -913,13 +959,17 @@ function place(e, x, y, w, h) {
 }
 
 /**
- * 한 판 돌리기 → { done: Promise<{ score, quit }>, stop(), music() }
+ * 한 판 돌리기 → { done: Promise<{ score, quit, world, win, land, line }>, stop(), music() }
  * stage = 그릴 자리(비워서 쓴다) · o.hero = 주인공 { html } (파트너 그림 또는 캐릭터) · o.art = { 100: 찌리리공, 17: 피죤 그림 주소|null } · o.rng
+ * o.world = 🌀 이번 판 땅 id (v440 — gameview ssokPrep이 고른다 · 없으면 🌿 풀밭)
+ * done: land = 끝까지 한 판이면 { id, v: 1 끝까지 · 2 🏅 } (보스를 이기든 도망가든 — ✕로 판 도중 그만두면 null) · line = 끝 화면 한 줄(「🌊 바다 🏅!」)
  * stop()은 ✕·집을 닫을 때 — 그 자리에서 끝(quit)
  */
 export function runSsok(stage, o = {}) {
   const now = () => performance.now();
   const rng = typeof o.rng === 'function' ? o.rng : Math.random;
+  const W = ssokWorld(o.world); // 🌀 이번 판 땅 (v440)
+  const WA = WORLD_ART[W.id] || {};
   stage.innerHTML = '';
   const root = el('div', 'gd ga gs');
   const top = el('div', 'gd-top');
@@ -930,17 +980,17 @@ export function runSsok(stage, o = {}) {
   abBtn.hidden = true;
   const prog = el('div', 'ga-prog');
   const progIn = el('i');
-  prog.append(progIn, el('span', 'ga-prog-flag', '🤖'));
-  // 🤖 보스 체력 — 싸움터에 들어서면 길 막대 대신
+  prog.append(progIn, el('span', 'ga-prog-flag', W.bossEmoji));
+  // 🤖 보스 체력 — 싸움터에 들어서면 길 막대 대신 (끝 그림은 그 땅 보스 — 풀밭 🤖 · 바다 🚢)
   const hp = el('div', 'gs-hp');
   const hpIn = el('i');
-  hp.append(hpIn, el('span', 'gs-hp-ico', '🤖'));
+  hp.append(hpIn, el('span', 'gs-hp-ico', W.bossEmoji));
   hp.hidden = true;
   // 🤝 구한 친구 수 — 처음엔 숨김
   const palsEl = el('span', 'gs-pals');
   palsEl.hidden = true;
   top.append(scoreEl, palsEl, abBtn, prog, hp);
-  const field = el('div', 'ga-field gs-field');
+  const field = el('div', `ga-field gs-field is-w-${W.id}`); // 🌀 땅 배경은 css .gs-field.is-w-* 안에서만(🗺️ 대모험과 같이 쓰는 .ga-* 꼴은 그대로)
   field.setAttribute('aria-label', '왼쪽 엄지: 톡 하면 폴짝, 꾹 누르면 둥실 · 오른쪽 엄지: 꾹 누르면 빨아들이기, 톡 하면 뱉기나 기술');
   const far = el('div', 'ga-far');
   const near = el('div', 'ga-near');
@@ -952,6 +1002,7 @@ export function runSsok(stage, o = {}) {
   const hint = el('p', 'ga-hint', '왼쪽 엄지 톡 폴짝 · 꾹 둥실 — 오른쪽 엄지 꾹 빨아들이기 · 톡 뱉기·기술');
   const fx = el('div', 'gd-fx');
   const banner = el('div', 'gd-banner', '준비!');
+  banner.appendChild(el('small', 'gs-land', `${W.emoji} ${W.ko}`)); // 「준비!」 밑에 이번 판 땅 이름 (v440 — 셈 글 없이 이름만)
   root.append(top, field, hint, fx, banner);
   stage.appendChild(root);
 
@@ -996,7 +1047,7 @@ export function runSsok(stage, o = {}) {
   let lostN = 0; // 그려 둔 능력 별의 번호
   let ballEl = null; // 🔴 머금은 몬스터볼(내 몸 위)
   // 🤝 이번 판 친구 셋 { id, ko, art? } — 게임기가 준비해 준다(gameview prep · 그림은 미리 받음) · 없으면(시험) 여기서 고른다(길 rng는 안 씀)
-  const friends = (Array.isArray(o.friends) && o.friends.length ? o.friends : ssokFriendPick(Math.random)).slice(0, FRIEND_MAX);
+  const friends = (Array.isArray(o.friends) && o.friends.length ? o.friends : ssokFriendPick(Math.random, FRIEND_MAX, W.friendIds)).slice(0, FRIEND_MAX);
   const pals = []; // 뒤따라오는 친구 그림 [{ fi, e, atkAt }]
   /** 친구 그림 — 받은 그림 · 깨지거나 없으면 🐾 */
   const palArt = (e, fi) => {
@@ -1022,7 +1073,7 @@ export function runSsok(stage, o = {}) {
     return e;
   };
   const mechaEl = (m) => {
-    const e = mover(m.n, `ga-mecha gs-mecha${m.ab ? ` is-${m.ab}` : ''}`, ADV_DRAW.mecha, m.w, m.h);
+    const e = mover(m.n, `ga-mecha gs-mecha${m.ab ? ` is-${m.ab}` : ''}`, WA.mecha || ADV_DRAW.mecha, m.w, m.h);
     if (m.ab) { const g = el('span', 'gs-badge'); g.innerHTML = abIcon(m.ab); e.appendChild(g); } // 머리 위 타입 그림 = 능력 메카
   };
   const fruitEl = (it) => {
@@ -1051,7 +1102,7 @@ export function runSsok(stage, o = {}) {
     }
     for (const b of s.blocks) {
       const e = el('span', `ga-obj gs-block is-${b.kind}`);
-      e.innerHTML = ART[b.kind];
+      e.innerHTML = WA[b.kind] || ART[b.kind];
       place(e, b.x, b.y, b.w, b.h);
       world.appendChild(e);
       els.set(b.n, e);
@@ -1065,7 +1116,7 @@ export function runSsok(stage, o = {}) {
       els.set(v.n, e);
     }
     for (const m of s.mechas) mechaEl(m);
-    for (const d of s.drones) mover(d.n, 'ga-mecha gs-drone', ART.drone, d.w, d.h);
+    for (const d of s.drones) mover(d.n, 'ga-mecha gs-drone', WA.drone || ART.drone, d.w, d.h);
     // 🔒 로켓단 우리 — 갇힌 친구 그림 위에 창살 · 🔴 큰 몬스터볼
     for (const c of s.cages) {
       const e = el('span', 'gs-cage');
@@ -1087,8 +1138,16 @@ export function runSsok(stage, o = {}) {
     }
     // 🤖 싸움터 — 보스는 처음부터 서 있다(멀리서 보인다)
     bossEl = el('span', 'gs-boss');
-    bossEl.innerHTML = ART.boss;
-    place(bossEl, st.arenaX + ARENA.bossX, GROUND, BOSS.w, BOSS.h);
+    bossEl.innerHTML = WA.boss || ART.boss;
+    const BB = st.boss || BOSS; // 🌀 땅 보스 수치 (v440 — 이때 s.boss는 아직 null)
+    place(bossEl, st.arenaX + ARENA.bossX, GROUND, BB.w, BB.h);
+    if (W.type && W.typeEmoji && Array.isArray(W.badge)) {
+      // 가슴 타입 배지 — 그림 글자만(svg를 넣으면 .gs-boss svg 맞음·쓰러짐 움직임이 배지에도 걸린다) · 맞는 능력이면 「효과가 굉장했다!」
+      const g = el('span', `gs-badge gs-boss-type is-t-${W.type}`, W.typeEmoji);
+      g.style.left = `${W.badge[0]}%`;
+      g.style.top = `${W.badge[1]}%`;
+      bossEl.appendChild(g);
+    }
     world.appendChild(bossEl);
     me = el('div', 'ga-me gs-me');
     meIn = el('div', 'ga-me-in');
@@ -1203,7 +1262,7 @@ export function runSsok(stage, o = {}) {
     zapEl.hidden = !s.zap || t - s.zap.t > 260;
     if (!zapEl.hidden) place(zapEl, s.zap.x - 2, s.zap.y, 4, ADV_H - s.zap.y);
     if (s.boss) {
-      hpIn.style.transform = `scaleX(${(s.boss.hp / BOSS.hp).toFixed(3)})`;
+      hpIn.style.transform = `scaleX(${(s.boss.hp / (s.boss.max || BOSS.hp)).toFixed(3)})`;
       if (bossEl) bossEl.classList.toggle('is-hit', t - s.boss.hitAt < 220);
     } else progIn.style.transform = `scaleX(${Math.max(0, Math.min(1, (s.x - START_X) / (s.stage.arenaX + ME.screen - START_X))).toFixed(3)})`;
   };
@@ -1254,25 +1313,28 @@ export function runSsok(stage, o = {}) {
     if (ev.thud) sfx.tick();
     for (const h of ev.hurt) {
       drop(h.o.n, 'is-knock');
-      head(h.kind === 'volt' || h.kind === 'ball' ? '찌릿! 꽈당!' : '꽈당!', 'is-zap');
+      head(h.kind === 'volt' || (h.kind === 'ball' && W.ballZap) ? '찌릿! 꽈당!' : '꽈당!', 'is-zap'); // 🌊 큰 R 부표는 전기가 아니다
       replay(me, 'is-bonk');
       sfx.hit();
       vibrate(80);
     }
     if (ev.spilled) head('앗, 놓쳤다!', 'is-zap');
     for (const v of ev.rolled) drop(v.n, 'is-roll');
-    for (const r of ev.thrown) mover(r.n, `ga-obj gs-roller is-${r.kind}`, r.kind === 'bolt' ? ART.bolt : '', r.w, r.h);
-    for (const r of ev.thrown) if (r.kind === 'ball') voltEl(els.get(r.n));
+    for (const r of ev.thrown) mover(r.n, `ga-obj gs-roller is-${r.kind}`, r.kind === 'bolt' ? WA.bolt || ART.bolt : WA.ball || '', r.w, r.h);
+    for (const r of ev.thrown) if (r.kind === 'ball' && !WA.ball) voltEl(els.get(r.n));
     for (const r of ev.rolledOff) drop(r.n, '');
     if (ev.rescued) { head('피죤이 건너편으로!', ''); sfx.whoosh(); }
     if (ev.helped) { head('영차! 피죤이 올려 줬어요', ''); sfx.whoosh(); }
     if (ev.boss) {
       prog.hidden = true;
       hp.hidden = false;
-      fly('🤖 로켓단 큰 메카가 나타났다!', s.stage.arenaX + ADV_W / 2, ADV_H - 14, 'is-big');
+      fly(W.appear, s.stage.arenaX + ADV_W / 2, ADV_H - 14, 'is-big');
       sfx.siren();
     }
     for (const d of ev.bossHit) { fly(`쾅! +${d}`, s.boss.x + s.boss.w / 2, s.boss.y + s.boss.h + 2, 'is-big'); sfx.boom(); }
+    // 💥 땅 보스 타입에 맞는 능력 (v440) — 싸움터 가운데 마당 위쪽(위에서 6칸 · 등장·도망 글 14칸 · 친구 글 20칸보다 위 ·
+    //   보스 머리 위 「쾅!」(32칸)·「🎉 이겼다!」(36칸)와 겹치지 않게 — 마지막 한 방이 ⚡면 셋이 한 걸음에 뜬다) · 한 걸음에 한 번만
+    if (ev.great && ev.great.length) fly('효과가 굉장했다!', s.stage.arenaX + ADV_W / 2, ADV_H - 6, 'is-big is-great');
     if (s.boss && !warned && !s.done && s.boss.until - s.last <= 5000) {
       warned = true;
       fly('로켓단이 도망가려 해요!', s.stage.arenaX + ADV_W / 2, ADV_H - 14, 'is-zap');
@@ -1332,8 +1394,17 @@ export function runSsok(stage, o = {}) {
     clearTimeout(settleTimer);
     resolveDone(r);
   };
+  /**
+   * 끝 결과 (v440) — 땅 셈은 quit이 아니라 「끝까지 갔나」(이김·도망)로 가른다: 끝 글을 보는 동안의 ✕(quit:false) ·
+   * 보스 쪽을 보는 1초 안의 ✕(quit:true)도 끝까지 한 판이다 · 판 도중 ✕만 land null(진행에 안 셈)
+   */
+  const result = (quit) => {
+    const win = !!(s && s.win);
+    const land = s && (s.win || s.fled) ? { id: W.id, v: win ? 2 : 1 } : null;
+    return { score: s ? s.score : 0, quit, world: W.id, win, land, line: ssokEndLine(W.id, win) };
+  };
   const finish = (quit) => {
-    if (finished) { if (quit) settle({ score: s ? s.score : 0, quit: false }); return; }
+    if (finished) { if (quit) settle(result(false)); return; }
     finished = true;
     clearInterval(timer);
     clearTimeout(endTimer);
@@ -1344,12 +1415,11 @@ export function runSsok(stage, o = {}) {
     document.removeEventListener('pointercancel', up);
     document.removeEventListener('keyup', onKeyUp);
     if (hasWin) window.removeEventListener('resize', measure);
-    const score = s ? s.score : 0;
-    if (quit) { settle({ score, quit: true }); return; }
+    if (quit) { settle(result(true)); return; }
     // 🤝 친구가 있으면 끝 글을 조금 더 오래 보여 준다
     banner.textContent = s ? ssokEndText(s, friends) : '끝!';
     banner.classList.add('is-on');
-    settleTimer = setTimeout(() => settle({ score, quit: false }), s && s.freed.length ? 2400 : 1400);
+    settleTimer = setTimeout(() => settle(result(false)), s && s.freed.length ? 2400 : 1400);
   };
   const loop = () => {
     if (!s || pausedAt || finished) return;
@@ -1447,7 +1517,7 @@ export function runSsok(stage, o = {}) {
     if (finished) return;
     banner.classList.remove('is-on');
     measure();
-    s = ssokStart(now(), rng);
+    s = ssokStart(now(), rng, null, W.id);
     build();
     root.classList.add('is-go');
     if (document.hidden) { pausedAt = now(); root.classList.add('is-paused'); }

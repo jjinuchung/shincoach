@@ -6,6 +6,8 @@
 // 저장: profile.homePlay = { days: { 기기 id: 마지막으로 💗를 받은 날 번호 }, bond: { 포켓몬 id: 💗 }, best?: { 게임 id: 최고 점수 } }
 //  · 🎮 미니 게임(v307 — minigame.js)의 최고 기록은 best — 늘기만 한다(병합은 칸마다 큰 쪽) · 한 번도 안 했으면 칸이 없다
 //  · ⏱️ 다 맞추면 끝나는 게임(v339 🖼️ 그림 맞추기 — GAMES clock)의 최고 기록은 fast: { 게임 id: 가장 빠른 초 } — 줄기만 한다(병합은 칸마다 작은 쪽) · 끝까지 한 판만
+//  · 🌀 쏙쏙 여섯 땅(v440 — ssokworld.js)의 진행도 best 안 열쇠로: 'ssok' + 땅 id(1 끝까지 · 2 🏅) · 'ssokv' 표지 — 새 칸(homePlay.ssok 같은)은
+//    playOf가 버려서 둘 데가 best뿐이다 · 늘기만 하고 병합은 큰 쪽이라 그대로 맞는다
 //  · 날은 트랜잭션 안의 시각으로 센다 · 지난 날보다 **뒤인 날**에만 준다(시계를 되돌려도 또 받지 않게 — 기록은 늘 큰 쪽)
 //  · 💗는 늘기만 한다 — 병합은 칸마다 큰 쪽(두 창·옛 백업을 합쳐도 늘어나지 않는다)
 //  · 진화하면 💗를 이어받는다 — 읽을 때 진화 전 모습들의 💗 중 가장 큰 것(bondOf), 주면 그 수 + 1을 지금 모습에 적는다(옛 칸은 지우지 않음 — 단조)
@@ -13,6 +15,7 @@ import { houseOf, houseShape, takenCells, furnById, turnOf, CUSHION } from './ho
 import { avatarOf, partnerSpot } from './avatar.js';
 import { evoFrom, evoOf, haveOf } from './evolve.js';
 import { dayNum } from './korean.js';
+import { ssokLandRule } from './ssokworld.js'; // 🌀 쏙쏙 여섯 땅 진행 (v440 — 순수 · best 안 땅 열쇠)
 
 /** 놀 수 있는 기기 — btn = 도구 줄 단추 · did = 장면 끝 말("개굴닌자와 ○○") */
 export const PLAYS = {
@@ -54,7 +57,9 @@ const DAY_MAX = 3e6;
 /** 🎮 미니 게임 최고 점수의 끝 · 게임 열쇠 꼴(minigame.GAMES의 id — 소문자) · 칸 수의 끝 */
 export const SCORE_MAX = 99999;
 const GAME_KEY = /^[a-z]{2,12}$/;
-const BEST_KEYS_MAX = 40;
+// v440 40 → 80 — 🌀 쏙쏙 땅 열쇠(땅마다 하나 + 표지)가 들어와 칸이 빠듯해졌다(넘치면 늦게 넣은 열쇠가 소리 없이 잘림) ·
+//   넘칠 무렵에 올리면 그 판을 아직 못 받은 태블릿의 옛 앱(40)이 저장할 때 자르므로 미리 올려 둔다 (시험 ssok440이 칸 수를 센다)
+export const BEST_KEYS_MAX = 80;
 /** ⏱️ 가장 빠른 시간(초)의 끝 — 하루 (v339) */
 export const FAST_MAX = 86400;
 
@@ -279,15 +284,19 @@ export function playRule(profile, roomId, u, now) {
  * 판은 시작할 때 이미 썼다(gameview — daily gamePlays) · 점수는 게임이 센 것(0 ~ SCORE_MAX로 자름 — 💰·스톤과 안 이어진다)
  * why: playRule과 같고 + 'game' 모르는 게임 · 최고 점수는 늘기만 한다(파트너가 없어도 적는다)
  * sec = ⏱️ 다 맞추는 데 걸린 초(v339 🖼️ 그림 맞추기 — 끝까지 한 판만 · 없으면 0) — 가장 빠른 시간은 줄기만 한다
- * → { ...playRule 결과, best, prevBest, newBest, fast, prevFast, newFast }
+ * land = 🌀 쏙쏙 땅 결과(v440 — { id, v: 1 끝까지 · 2 🏅 } · ✕로 판 도중 그만두면 null) — 쏙쏙 판만 진행을 적는다(같은 트랜잭션 · 저장된 프로필로 다시 셈)
+ * → { ...playRule 결과, best, prevBest, newBest, fast, prevFast, newFast, land? }  (land = 쏙쏙 판이면 { id, prev, now, opened } | null)
  */
-export function gameEndRule(profile, roomId, u, gameId, score, now, sec = 0) {
+export function gameEndRule(profile, roomId, u, gameId, score, now, sec = 0, land = null) {
   const key = recKey(gameId); // 🎮 새 난이도 기록 열쇠 (v351)
   if (!key) return { ok: false, why: 'game' };
   const r = playRule(profile, roomId, u, now);
   if (!r.ok) return r;
   const hp = playOf(profile.homePlay);
   const prevBest = bestOf(hp, key);
+  // 🌀 쏙쏙 땅 진행 (v440) — 이번 판 점수를 적기 전의 best로(옛 기록 ssokh가 있으면 풀밭을 끝낸 것으로 옮긴다) · 다른 게임은 열쇠를 안 만든다
+  const lr = gameId === 'ssok' ? ssokLandRule(hp.best, land) : null;
+  if (lr && lr.changed) hp.best = lr.best;
   const s = Number.isSafeInteger(score) && score > 0 ? Math.min(score, SCORE_MAX) : 0;
   const newBest = s > prevBest;
   if (newBest) hp.best = { ...(hp.best || {}), [key]: s };
@@ -295,6 +304,6 @@ export function gameEndRule(profile, roomId, u, gameId, score, now, sec = 0) {
   const t = Number.isSafeInteger(sec) && sec > 0 && sec <= FAST_MAX ? sec : 0;
   const newFast = t > 0 && (!prevFast || t < prevFast);
   if (newFast) hp.fast = { ...(hp.fast || {}), [key]: t };
-  if (newBest || newFast) profile.homePlay = hp;
-  return { ...r, best: Math.max(prevBest, s), prevBest, newBest, fast: newFast ? t : prevFast, prevFast, newFast };
+  if (newBest || newFast || (lr && lr.changed)) profile.homePlay = hp; // 땅만 바뀐 판(최고 기록보다 낮은 점수)도 적는다
+  return { ...r, best: Math.max(prevBest, s), prevBest, newBest, fast: newFast ? t : prevFast, prevFast, newFast, ...(lr ? { land: lr.land } : {}) };
 }

@@ -4418,6 +4418,7 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 .gm-game-how { font-size: 0.85rem; color: #555; word-break: keep-all; }
 .gm-game-best { font-size: 0.85rem; font-weight: 700; color: #e67700; }
 .gm-game-easy { font-size: 0.72rem; font-weight: 600; color: #8a8f98; } /* 쉬울 때 기록 — 작고 흐리게 (v351) */
+.gm-game-new { justify-self: start; padding: 0 0.5rem; border-radius: 999px; background: #e8413b; color: #fff; font-size: 0.8rem; font-weight: 800; } /* 🌀 쏙쏙 「🆕 🌊」 — 안 가 본 땅이 열려 있을 때만 (v440) */
 .gm-close { justify-self: center; }
 .gm-play-title { margin: 0; text-align: center; font-weight: 800; }
 .gm-stage { width: 100%; max-width: calc((100vh - 220px) * 1.05); justify-self: center; } /* 낮은 가로 화면에서도 판이 한 화면에(누르는 동안 카드가 안 밀리게) */
@@ -4712,6 +4713,19 @@ button.kor-pline:focus-visible, .kor-pline-chip:focus-visible { outline: 3px sol
 @keyframes gs-hit { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4%); } 75% { transform: translateX(4%); } }
 @keyframes gs-down { to { transform: rotate(80deg) translateY(10%); opacity: 0.4; } }
 @keyframes gs-flee { 30% { transform: translateY(6%); } 100% { transform: translate(120%, -160%) scale(0.5); opacity: 0; } }
+/* 🌀 여섯 땅 (v440 · ssokworld.js) — 땅 배경은 .gs-field.is-w-* 안에서만(.ga-* 바탕 꼴은 🗺️ 대모험과 같이 쓴다) · 먼 층 50칸·가까운 층 30칸 무늬
+   (크기는 JS measure가 인라인으로 정한다 — 무늬는 그 한 칸에 맞춰 그림) · 바탕은 움직이지 않는다(2 GB 태블릿) · 그림 파일 0장 */
+.gs .gd-banner .gs-land { display: block; margin-top: 0.3rem; font-size: 1.5rem; text-align: center; } /* 「준비!」 밑 이번 판 땅 이름 */
+.gs .gd-fly.is-great { color: #c92a2a; white-space: nowrap; } /* 💥 효과가 굉장했다! — 좁은 폰에서도 한 줄 */
+.gs-boss { container-type: inline-size; }
+.gs-boss .gs-boss-type { width: 30%; aspect-ratio: 1; display: grid; place-items: center; border: 3px solid #339af0; border-radius: 50%; background: #fff; font-size: 1rem; font-size: max(0.75rem, 16cqw); line-height: 1; } /* 가슴 타입 배지 (cqw를 모르는 옛 브라우저는 1rem) */
+.gs-boss.is-down .gs-boss-type, .gs-boss.is-flee .gs-boss-type { visibility: hidden; } /* 보스 그림만 쓰러지거나 날아가니 배지가 공중에 남지 않게 */
+/* 🌊 바다 — 맑은 하늘 · 수평선 남색 띠와 파도 줄 · 먼 배 · 잔교 말뚝 줄 · 모래 땅 · 나무 판자 · 구덩이(마당 아래 띠)는 짙은 바닷물 (야자나무는 쓰지 않는다) */
+.gs-field.is-w-sea { background-color: #a5d8ff; background-image: linear-gradient(180deg, #3d8fe0 0%, #a5d8ff 60%, #e7f5ff 87.5%, #1971c2 87.5%, #0b3f7a 100%); }
+.gs-field.is-w-sea .ga-far { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 49' preserveAspectRatio='none'%3E%3Crect y='27' width='100' height='22' fill='%231c7ed6'/%3E%3Crect y='26' width='100' height='2' fill='%231864ab'/%3E%3Cpath d='M0 34q6.25-3 12.5 0t12.5 0t12.5 0t12.5 0t12.5 0t12.5 0t12.5 0t12.5 0M0 42q6.25-3 12.5 0t12.5 0t12.5 0t12.5 0t12.5 0t12.5 0t12.5 0t12.5 0' fill='none' stroke='%2374c0fc' stroke-width='1.2'/%3E%3Cg fill='%23284b7a'%3E%3Cpath d='M60 22h22l-3 5H63z'/%3E%3Crect x='66' y='16.5' width='10' height='5.5'/%3E%3Crect x='72' y='12' width='2.6' height='4.5'/%3E%3C/g%3E%3C/svg%3E"); }
+.gs-field.is-w-sea .ga-near { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 47' preserveAspectRatio='none'%3E%3Cpath d='M0 18Q22 28 44 15M54 15Q76 28 100 18' fill='none' stroke='%23e9c46a' stroke-width='2'/%3E%3Crect x='44' y='12' width='10' height='35' fill='%238d6e4f' stroke='%235c4532' stroke-width='2'/%3E%3Cellipse cx='49' cy='12' rx='5' ry='2' fill='%23a98467'/%3E%3C/svg%3E"); }
+.gs-field.is-w-sea .ga-ground { border-top-color: #d4a017; background-color: #e9c46a; background-image: linear-gradient(180deg, #fff3bf 0 30%, #e9c46a 30%); }
+.gs-field.is-w-sea .ga-solid { border-color: #5c3d1e; background-color: #a0673a; background-image: repeating-linear-gradient(180deg, #a0673a 0 6px, #7d4f26 6px 8px); }
 @media (prefers-reduced-motion: reduce) {
   .gs-me-ball svg, .gs-pal > *, .gs-me.is-puff .ga-me-in, .gs-wind path, .gs-drone svg, .gs-roller > *, .gs-shot svg, .gs-lost svg, .gs-mecha.is-pull svg, .gs-drone.is-pull svg { animation: none; }
 }

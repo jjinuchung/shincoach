@@ -35,6 +35,7 @@ import { copyTour, mergeTour } from './aquatour.js'; // 🎟️ 아쿠아리움 
 import { copyPiano, mergePiano, PIANO_DAILY } from './piano.js'; // 🎹 음악 과목 복사·병합·하루 칸 (v402 — 순수)
 import { copyEnTest, mergeEnTest, mergeEnThrow, EN_TEST_DAILY } from './entest.js'; // 🎬 영어 영상 시험 칸·🎯 영어 잡기 장부 복사·병합·하루 칸 (v430 — 순수, grammar·korean만 import)
 import { copyLake, mergeLake } from './fishing.js'; // 🎣 학습 낚시터 도감·하루 💰 복사·병합 (v366 — 순수, 아무것도 import하지 않음)
+import { SSOK_DAILY, SSOK_DAY_LISTS } from './ssokworld.js'; // 🌀 쏙쏙 여섯 땅 하루 칸 (v440 — 순수, 아무것도 import하지 않음)
 import { healMoveHouse } from './moveday.js'; // 🚚 이사를 끝낸 기록과 가방이 갈라지면 집 선물만 되찾기 (v397 — 순수)
 import { copyJourney, mergeJourney } from './journey.js'; // 🎒 포켓몬 대여행 복사·병합 (v341 — 순수, evolve·items·montypes만 import)
 import { pickGhost, readGhosts, writeGhosts, addGhosts, dropGhost } from './ghosts.js'; // 👻 되살린 백업의 영상 자리 (v361 — 순수·localStorage, import 없음)
@@ -506,6 +507,8 @@ const DAILY_SUMS = ['seconds', 'speakAttempts', 'speakPass', 'puzzles', 'puzzleS
   // 🎮 게임기 미니 게임 (2026-10-21 v307, minigame.js) — 오늘 쓴 판(시작할 때 claimDailyCount로 선점 · 끝은 그날 공부 시간에서 셈) ·
   //   🔒 부모가 더 준 판 · 게임 화면에 머문 초(🕒 사용 기록). 병합 maxOf라 옛 백업으로 쓴 판을 되살리지 못한다
   'gamePlays', 'gameBonus', 'uGame',
+  //   🌀 쏙쏙 여섯 땅 (2026-11-26 v440, ssokworld.js) — 끝까지 한 판(이기든 로켓단이 도망가든 · ✕로 그만둔 판은 안 셈) · 그 가운데 🏅 보스를 이긴 판 (📤 usage에만)
+  ...SSOK_DAILY,
   // 🏦 증권시장 화면에 머문 초 (2026-10-22 v319 — 🕒 사용 기록)
   'uStock',
   // 🎒 포켓몬 대여행 창에 머문 초 (2026-10-26 v341 — 🕒 사용 기록)
@@ -558,7 +561,8 @@ const DAILY_FLAGS = ['goalRewarded', 'hpMissed', 'reviewGolden', 'essayDone'];
 // 🎣 fishMathKeys: 낚시터에서 낸 「이미 배운 수학」 문제 한 줄씩 '칸|맞음 0·1|시각' (v377 — 칸별 맞힘을 📤에 · 합집합이라 두 기기가 같은 줄을 두 번 세지 않는다)
 // 🔁 fishRedoKeys: 다시 풀기 한 줄씩 '칸|차례 1·2|맞음|시각' (v387 — 다음 낚시 날 몫·「거듭 틀린 칸」을 이것으로) · 🎚️ fishSteps: 그날 과목 단계 'english:1'·'top:english' (그날 처음 열 때 한 번 적음) ·
 //   🔁 fishRedoWait: 틀린 배운 칸 '칸|단계|문제 글 지문|시각' (Codex 190차 — 다시 열거나 다음 날에도 같은 단계·다른 문제로)
-const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', 'useSlots', 'essaySayKeys', 'fishMathKeys', 'fishRedoKeys', 'fishSteps', 'fishRedoWait', ...SUN_DAY_LISTS, ...ONE_DAY_LISTS, ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];
+// 🌀 ssokLands·ssokMedals: 그날 끝까지 한 땅 · 🏅 받은 땅 id (v440, ssokworld.ssokDayDelta — 📤 「다녀온 땅 · 🏅」 · 합집합이라 두 판·두 기기가 같은 땅을 두 번 적지 않는다)
+const DAILY_LISTS = ['reviewStoneKeys', 'favExtraKeys', 'speakFirstKeys', ...SSOK_DAY_LISTS, 'useSlots', 'essaySayKeys', 'fishMathKeys', 'fishRedoKeys', 'fishSteps', 'fishRedoWait', ...SUN_DAY_LISTS, ...ONE_DAY_LISTS, ...KOR_DAY_LISTS, ...PUZZLE_DAY_LISTS];
 
 /** 빈 오늘 기록 (모든 수치 0, 모든 플래그 false) */
 export function emptyDaily(date) {

@@ -64,7 +64,7 @@ test('🖼️ 게임 목록 — 열째 · 시간 제한 없음(clock — 최고 
     assert.ok(body.includes('wideCard(false);'), f);
   }
   // 끝 → 걸린 시간을 저장으로 (⏱️ 게임만 · 그만둔 판은 sec 없음) · 고르기 카드의 기록 줄
-  assert.ok(gv.includes('await gameEnd(ctx.roomId, ctx.u, id, res.score, g.clock ? res.sec || 0 : 0);'));
+  assert.ok(gv.includes('await gameEnd(ctx.roomId, ctx.u, id, res.score, g.clock ? res.sec || 0 : 0, res.land || null);')); // 🌀 쏙쏙 땅 결과 (v440)
   assert.match(gv, /const rec = recordText\(g\);\n\s+if \(rec\.best\) txt\.appendChild\(el\('span', 'gm-game-best', rec\.best\)\);/); // v351 — 쉬울 때 기록은 따로 작게(games351)
   // 그림을 못 펼쳐 돌려받은 판 — 고르기 화면에 한 줄
   assert.ok(gv.includes('if (live() && res.msg) ui.msg = res.msg;'));
