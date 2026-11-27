@@ -36,7 +36,7 @@
 //  · 음식은 가방(profile.items['food_…']) · 넣은 자리는 house.fridge { 칸: 음식 } — houseOf가 fridgeCopy로 고쳐 함께 싣는다(집 규칙이 저장해도 안 사라지게)
 //  · 🥕 사기는 🧊 냉장고를 가져야(서랍에 있어도) · 실마다 칸 수까지 · 넣기·꺼내기는 놓인 냉장고가 있어야(어느 층이든 · 안은 하나)
 
-import { foodById, slotZone, fridgeCopy, foodTray, zoneOwned, CAP as FOOD_CAP } from './food.js'; // 🧊 음식 자료 (순수 — food.js는 아무것도 import하지 않는다)
+import { foodById, slotZone, fridgeCopy, foodTray, zoneOwned, foodOwned, CAP as FOOD_CAP } from './food.js'; // 🧊 음식 자료 (순수 — food.js는 아무것도 import하지 않는다)
 
 /** 방 크기 — 바닥 W × H칸, 벽 WALL칸 */
 export const ROOM = { W: 8, H: 6, WALL: 8 };
@@ -704,4 +704,19 @@ export function fridgeTakeRule(profile, slot) {
   if (Object.keys(next).length) h.fridge = next; else delete h.fridge;
   profile.house = h;
   return { ok: true, id };
+}
+
+/**
+ * 🗑️ 음식 버리기 (v443 · 11-26 점검) — 🧺 내 음식(가진 수 − 넣은 수)에서 하나 · 💰는 돌려주지 않는다(되팔지 않는다 — 코인이 불어나는 길이 없다)
+ * 버리는 길이 없어, 칸 수만큼 사면 그 실은 영영 「꽉 찼어요」였다(다른 음식으로 바꿀 수 없었다) · 넣어 둔 음식은 꺼낸 뒤에 버린다
+ * why: 'nofridge' 놓인 냉장고가 없음(버리기는 냉장고 화면에서만) · 'unknown' 음식이 아님 · 'none' 바구니에 없음(다 넣었거나 다른 화면에서 버림)
+ */
+export function foodDropRule(profile, id) {
+  const h = houseOf(profile);
+  if (!fridgePlaced(h)) return { ok: false, why: 'nofridge' };
+  if (!foodById(id)) return { ok: false, why: 'unknown' };
+  if (!(foodTray(profile.items, h.fridge || {})[id] > 0)) return { ok: false, why: 'none' };
+  const left = foodOwned(profile.items, id) - 1;
+  if (left > 0) profile.items[id] = left; else delete profile.items[id];
+  return { ok: true };
 }

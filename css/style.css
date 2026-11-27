@@ -3508,6 +3508,9 @@ button.mpz-cell.is-no { border-style: solid; border-color: #dc2626; background: 
 .fz-n { font-size: 0.74rem; font-weight: 700; }
 .fz-c { position: absolute; top: 0; right: 4px; font-size: 0.72rem; font-weight: 800; color: var(--primary); }
 .fz-tray-empty { font-size: 0.82rem; color: #6b7280; }
+/* 🗑️ 고른 음식 버리기 (v443) — 고른 음식 바로 옆 · 한 번 누르면 「한 번 더!」(빨간 테) */
+.fz-drop { flex: none; align-self: center; min-height: 44px; padding: 6px 10px; border-radius: 10px; border: 2px solid #e3e8ee; background: #fff; font: inherit; font-size: 0.8rem; font-weight: 800; white-space: nowrap; color: #6b7280; cursor: pointer; }
+.fz-drop.is-arm { border-color: #dc2626; background: #fef2f2; color: #b91c1c; }
 @media (max-width: 520px) {
   .fz-inside { gap: 4px; }
   .fz-box, .fz-doorp { padding: 5px 4px; border-width: 2px; }

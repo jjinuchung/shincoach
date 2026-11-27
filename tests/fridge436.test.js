@@ -125,9 +125,9 @@ test('🔍 Codex 240차 #2 · 리뷰 워크플로: 바구니가 빈 말 — 칸�
   assert.equal(trayEmptyLine('frozen', 0), '냉동실에 넣을 음식이 없어요 — 🛒 가구 상점의 🥕 마트에서 사 와요.');
   const { martWhy } = await import('../js/houseview.js');
   const apple = foodById(A);
-  assert.equal(martWhy({ why: 'full', zone: 'cold', placed: 22 }, apple), '냉장실이 꽉 찼어요 — 더 넣을 칸이 없어요');
-  assert.equal(martWhy({ why: 'full', zone: 'frozen', placed: 4 }, apple), '냉동실에 넣을 음식을 칸만큼 가졌어요 — 🧊 냉장고를 열어 🧺 내 음식부터 넣어 봐요');
-  assert.equal(martWhy({ why: 'full' }, apple), '냉장고에 넣을 음식을 칸만큼 가졌어요 — 🧊 냉장고를 열어 🧺 내 음식부터 넣어 봐요', '깨진 판정에도 멎지 않음');
+  assert.equal(martWhy({ why: 'full', zone: 'cold', placed: 22 }, apple), '냉장실이 꽉 찼어요 — 🧊 냉장고에서 음식을 꺼내 🧺 내 음식에서 🗑️ 버리면 다른 음식을 살 수 있어요');
+  assert.equal(martWhy({ why: 'full', zone: 'frozen', placed: 4 }, apple), '냉동실에 넣을 음식을 칸만큼 가졌어요 — 🧊 냉장고를 열어 🧺 내 음식을 넣거나 🗑️ 버려요');
+  assert.equal(martWhy({ why: 'full' }, apple), '냉장고에 넣을 음식을 칸만큼 가졌어요 — 🧊 냉장고를 열어 🧺 내 음식을 넣거나 🗑️ 버려요', '깨진 판정에도 멎지 않음');
   assert.equal(martWhy({ why: 'short' }, apple), '🍎 사과 — 코인 0개가 모자라요. 배우고 다시 와요!', 'shortCoins가 없어도 멎지 않음');
 });
 
@@ -209,8 +209,8 @@ test('🧊 화면 잇기 — 냉장고 도구 [🧊 열기] · 집을 닫으면 
   assert.match(tap, /try \{ r = await houseDo\(\(p\) => foodBuyRule\(p, id\)\); \}/);
   const { martWhy, MART_HINT } = await import('../js/houseview.js');
   const apple = foodById(A);
-  assert.equal(martWhy({ why: 'full', zone: 'cold', placed: 22 }, apple), '냉장실이 꽉 찼어요 — 더 넣을 칸이 없어요');
-  assert.equal(martWhy({ why: 'full', zone: 'frozen', placed: 18 }, apple), '냉동실이 꽉 찼어요 — 더 넣을 칸이 없어요');
+  assert.equal(martWhy({ why: 'full', zone: 'cold', placed: 22 }, apple), '냉장실이 꽉 찼어요 — 🧊 냉장고에서 음식을 꺼내 🧺 내 음식에서 🗑️ 버리면 다른 음식을 살 수 있어요');
+  assert.equal(martWhy({ why: 'full', zone: 'frozen', placed: 18 }, apple), '냉동실이 꽉 찼어요 — 🧊 냉장고에서 음식을 꺼내 🧺 내 음식에서 🗑️ 버리면 다른 음식을 살 수 있어요');
   assert.equal(martWhy({ why: 'short', shortCoins: 1200 }, apple), '🍎 사과 — 코인 1,200개가 모자라요. 배우고 다시 와요!');
   assert.match(tap, /else ui\.msg = r \? martWhy\(r, f\) : WHY\.save;/, '안 되면 저장된 판정 그대로');
   assert.match(tap, /fridgePlaced\(houseNow\(\)\) \? '🧊 냉장고를 열어 넣어 봐요' : '🗄️ 서랍의 🧊 냉장고를 방에 놓으면 열 수 있어요'/, '냉장고가 서랍에만 있으면');

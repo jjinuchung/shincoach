@@ -257,11 +257,14 @@ async function main() {
   initBlackbox(); // 🛑 몇 초마다 지금 자리를 이 기기에 · 정상으로 닫히면 지움 → 다음에 켤 때 남은 것 = 저절로 꺼진 창 (안에서 오류를 삼킨다)
   // 🚀 끝나지 않은 로켓단 배틀이 있으면 그 과목 화면으로 — 수학 화면이 열리면 거기서 이어 간다 (아버님 결정 (다): 앱이 꺼져도
   //    다음에 열면 이어진다 — 도망칠 수도 억울할 수도 없게). 아직 홈에 있을 때만 · 그 과목 시간이 다 됐으면 다시 열 수 있을 때
+  //    국어·논술도 (v443 · 11-26 점검) — 예전엔 수학·영어만이라, 국어·논술 로켓단 도중 앱이 꺼지면 그 화면에 다시 들어갈 때까지
+  //    과목 공용 칸(rocketCur)이 남아 영어·수학 로켓단이 안 나오고 아지트 되찾기도 멈췄다 (그 화면이 열리면 korrocket.resumeKorRocketIfAny가 이어 간다)
   Promise.all([timeReady, profileReady()]).then(() => {
     const rc = rocketCurrent();
     if (!rc || views.home.hidden) return;
     if (rc.subject === 'math' && !isLocked('math')) showView('math');
     else if (rc.subject === 'en' && !isLocked('english')) resumeEnglishRocket().catch(() => {}); // 영어는 영상 없이 홈에서 바로 (저장된 단어로)
+    else if (rc.subject === 'kor' && !isLocked('korean')) showView(rc.stem === 'nonsul' ? 'nonsul' : 'korean'); // 국어·논술은 시작한 화면에서 (v443)
   }).catch(() => {});
   requestPersistentStorage();
   registerServiceWorker();

@@ -9,6 +9,8 @@
 //  · fakeIdb.get / fakeIdb.put — 저장된 값을 직접 읽고 쓴다 (다른 창이 쓴 것 흉내)
 //  · fakeIdb.failNextRead('daily') — 그 저장소의 다음 getAll 하나가 오류 (목록 읽기 실패 흉내, v329 🔥)
 //  · fakeIdb.failNextGet('profile', 'math') — 그 저장소의 다음 get 하나가 오류 · 열쇠를 주면 그 줄만 (한 줄 읽기 실패 흉내, v396)
+//  · fakeIdb.failNextOpen() — 다음 indexedDB.open 하나가 오류 · fakeIdb.throwNextOpen() — 그 자리에서 던짐 · fakeIdb.dropConnections() — 열린 연결이 끊김 ·
+//    fakeIdb.lateClose() · fakeIdb.opens() (v443)
 const data = new Map(); // 저장소 이름 → Map(열쇠 → 값)
 const keyPaths = new Map();
 const fails = [];
@@ -69,7 +71,7 @@ function makeTx(names) {
       keyPath: kp, // db.importStats가 rec[store.keyPath]로 열쇠를 읽는다 (v361 — 없으면 가져오기가 모든 줄을 조용히 건너뛰었다)
       get: (k) => request(() => {
         const fi = getFails.findIndex((f) => f.store === n && (f.key === undefined || f.key === k));
-        if (fi >= 0) { getFails.splice(fi, 1); throw new Error(`읽기 실패 흉내: ${n}`); }
+        if (fi >= 0) { const [f] = getFails.splice(fi, 1); const e = new Error(`읽기 실패 흉내: ${n}`); if (f.name) e.name = f.name; throw e; }
         return copy(m.get(k));
       }),
       getAll: () => request(() => {
@@ -87,20 +89,42 @@ function makeTx(names) {
   return tx;
 }
 
-const db = {
-  objectStoreNames: { contains: (n) => data.has(n) },
-  createObjectStore(n, o = {}) { data.set(n, new Map()); keyPaths.set(n, o.keyPath); return { createIndex() {} }; },
-  transaction: (names) => makeTx(names),
-  close() {},
-  onversionchange: null,
-};
+// 연결은 열 때마다 새로(자료는 함께 쓴다) — 닫힌 연결로 트랜잭션을 열면 진짜처럼 InvalidStateError (v443 — 다시 여는 길을 시험하려고)
+const conns = [];
+let openFails = 0;
+let openThrows = 0;
+let openCount = 0;
+function makeConn() {
+  const c = {
+    closed: false,
+    objectStoreNames: { contains: (n) => data.has(n) },
+    createObjectStore(n, o = {}) { data.set(n, new Map()); keyPaths.set(n, o.keyPath); return { createIndex() {} }; },
+    transaction: (names) => {
+      if (c.closed) { const e = new Error('The database connection is closing.'); e.name = 'InvalidStateError'; throw e; }
+      return makeTx(names);
+    },
+    close() { c.closed = true; },
+    onversionchange: null,
+    onclose: null,
+  };
+  conns.push(c);
+  return c;
+}
 let upgraded = false;
 
 globalThis.indexedDB = {
   open() {
+    openCount += 1;
+    if (openThrows > 0) { openThrows -= 1; const e = new Error('저장소 열기 실패 (테스트가 일부러 · 그 자리에서 던짐)'); e.name = 'SecurityError'; throw e; }
     const req = { result: null, error: null, onupgradeneeded: null, onsuccess: null, onerror: null, onblocked: null };
     setTimeout(() => {
-      req.result = db;
+      if (openFails > 0) {
+        openFails -= 1;
+        req.error = new Error('저장소 열기 실패 (테스트가 일부러)');
+        if (req.onerror) req.onerror();
+        return;
+      }
+      req.result = makeConn();
       if (!upgraded) { upgraded = true; if (req.onupgradeneeded) req.onupgradeneeded(); }
       if (req.onsuccess) req.onsuccess();
     }, 0);
@@ -117,10 +141,24 @@ export const fakeIdb = {
   failNext: (store) => { fails.push(store); },
   /** 그 저장소의 다음 getAll 하나를 오류로 */
   failNextRead: (store) => { readFails.push(store); },
-  /** 그 저장소의 다음 get 하나를 오류로 (key를 주면 그 줄을 읽을 때만) */
-  failNextGet: (store, key) => { getFails.push({ store, key }); },
+  /** 그 저장소의 다음 get 하나를 오류로 (key를 주면 그 줄을 읽을 때만 · name을 주면 그 이름의 오류로 — 끊긴 연결 흉내 'InvalidStateError'·'AbortError', v443) */
+  failNextGet: (store, key, name) => { getFails.push({ store, key, name }); },
   /** 걸어 둔 실패가 아직 남았나 (테스트가 엉뚱한 연산에 실패를 쓰지 않았는지 확인) */
   failsLeft: () => fails.length + readFails.length + getFails.length,
   /** 모든 저장소를 비운다 — 새 기기 흉내 (☁️ 되살리기, v361) */
   clear: () => { for (const m of data.values()) m.clear(); },
+  /** 다음 indexedDB.open 하나를 오류로 (저장소 열기 실패 흉내, v443) */
+  failNextOpen: () => { openFails += 1; },
+  /** 다음 indexedDB.open 하나가 그 자리에서 던진다 — onerror를 안 거치는 실패(SecurityError 등) 흉내 (v443) */
+  throwNextOpen: () => { openThrows += 1; },
+  /** 열린 연결을 모두 끊는다 — 브라우저가 연결을 닫은 흉내(그 연결은 InvalidStateError · onclose가 불린다, v443) · 끊은 수를 돌려준다 */
+  dropConnections: () => {
+    const live = conns.filter((c) => !c.closed);
+    for (const c of live) { c.closed = true; if (c.onclose) c.onclose(); }
+    return live.length;
+  },
+  /** 이미 끊긴 연결의 onclose를 한 번 더 — 늦게 온 닫힘 알림 흉내 (v443) */
+  lateClose: () => { for (const c of conns) if (c.closed && c.onclose) c.onclose(); },
+  /** indexedDB.open이 불린 수 (v443) */
+  opens: () => openCount,
 };

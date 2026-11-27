@@ -310,7 +310,9 @@ test('🔁⏹ 화면 배선(math.js): 편 번호·시작한 날·미리 안내·
   assert.ok(src.includes("back.addEventListener('click', () => { parkRound(); ui.round = null;"), '← 머리 단추: 비우기 전에 (⛺ v377 — 개념 편은 세워 두고 아니면 quitLive)');
   assert.ok(/ {2}quitLive\(\);\r?\n\}/.test(src.slice(src.indexOf('function parkRound('), src.indexOf('function dropParked('))), '세우지 못하는 편은 예전처럼 그만둠');
   const rm = fn('renderMath');
-  assert.ok(rm.indexOf('state = await settleLive(state);') > rm.indexOf('syncMathReplies(state)') && rm.indexOf('state = await settleLive(state);') < rm.indexOf('ui.state = state;'));
+  // 📬 답장 받기는 사다리를 그린 뒤 뒤에서(v443 — tests/fix443.test.js) — 예전엔 settleLive 앞에서 기다렸다
+  assert.ok(rm.indexOf('state = await settleLive(state);') > rm.indexOf('await Promise.all([getMath(), buildOpts()])') && rm.indexOf('state = await settleLive(state);') < rm.indexOf('ui.state = state;'));
+  assert.ok(rm.indexOf('await Promise.all([getMath(), buildOpts()])') > 0);
   assert.ok(rm.indexOf('if (r) {') < rm.indexOf('settleLive'), '🎒·📊 다녀온 것(ui.round 있음)은 정리 전에 이어서 — 멈춤');
   const sl = fn('settleLive');
   assert.ok(sl.includes('const held = await heldRids();') && sl.includes('const settle = new Set(waiting.map((l) => l.rid).filter((rid) => !held.has(rid)));') && sl.includes('settleLives(s, liveKeep(s, settle, ui.round && ui.round.rid), today);'), '다른 창이 쥔 편·잠금을 본 뒤 생긴 편·이 창이 푸는 편은 그대로 (Codex 63차 #3)');

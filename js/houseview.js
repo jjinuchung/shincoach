@@ -1420,12 +1420,12 @@ function martBox(pf) {
   }
   return box;
 }
-/** 마트에서 안 될 때의 말 (순수) — 꽉 찬 실은 이름으로(칸을 다 채웠으면 「꽉 찼어요」, 바구니에 남았으면 「바구니부터 넣어요」) · 모자란 코인은 몇 개 */
+/** 마트에서 안 될 때의 말 (순수) — 꽉 찬 실은 이름으로(칸을 다 채웠으면 「꽉 찼어요」 + 바꾸는 길(꺼내서 🗑️ 버리기 — v443), 바구니에 남았으면 「넣거나 🗑️ 버려요」 — 꺼내기만 하고 돌아온 아이가 다시 넣으라는 말만 듣지 않게) · 모자란 코인은 몇 개 */
 export function martWhy(c, f) {
   if (c.why === 'nofridge') return '🧊 냉장고가 있어야 음식을 살 수 있어요 — 🪑 가구의 📺 기기에서 냉장고를 먼저 사요';
   if (c.why === 'full') {
     const zone = ZONE_KO[c.zone] || '냉장고';
-    return ZONE_KO[c.zone] && (Number(c.placed) || 0) >= FOOD_CAP[c.zone] ? `${zone}이 꽉 찼어요 — 더 넣을 칸이 없어요` : `${zone}에 넣을 음식을 칸만큼 가졌어요 — 🧊 냉장고를 열어 🧺 내 음식부터 넣어 봐요`;
+    return ZONE_KO[c.zone] && (Number(c.placed) || 0) >= FOOD_CAP[c.zone] ? `${zone}이 꽉 찼어요 — 🧊 냉장고에서 음식을 꺼내 🧺 내 음식에서 🗑️ 버리면 다른 음식을 살 수 있어요` : `${zone}에 넣을 음식을 칸만큼 가졌어요 — 🧊 냉장고를 열어 🧺 내 음식을 넣거나 🗑️ 버려요`;
   }
   if (c.why === 'short') return `${f.emoji} ${f.ko} — 코인 ${(Number(c.shortCoins) || 0).toLocaleString('ko-KR')}개가 모자라요. 배우고 다시 와요!`;
   return WHY[c.why] || '다시 해 볼까요?';

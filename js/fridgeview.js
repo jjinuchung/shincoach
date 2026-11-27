@@ -2,10 +2,11 @@
 // 방의 냉장고를 누르고 [🧊 열기] → 화면 가득 앞모습(방 그림과 같은 꼴: 위 작은 문 ❄️ 냉동실 · 아래 큰 문 🥛 냉장실) →
 // 문을 누르면 열리며 안을 가까이(냉장실: 선반 셋 · 채소·과일 칸 · 문 칸 셋 / 냉동실: 위 선반 · 서랍 둘 · 양쪽 문 칸) →
 // 아래 🧺 내 음식에서 고르고 빛나는 칸을 누르면 넣고, 넣은 음식을 누르면 꺼낸다 · 넣으면 파트너가 옆에서 「맛있겠다!」(💗 없음)
-// 규칙은 house.js(fridgePutRule·fridgeTakeRule — 저장된 프로필로 한 트랜잭션), 자료는 food.js — 이 파일은 그리고 잇기만.
+// 🗑️ 버리기 (v443 · 11-26 점검): 🧺에서 고른 음식 옆 [🗑️ 버리기] — 두 번 눌러 하나 · 💰는 안 돌아온다(꽉 찬 실을 다른 음식으로 바꾸는 길)
+// 규칙은 house.js(fridgePutRule·fridgeTakeRule·foodDropRule — 저장된 프로필로 한 트랜잭션), 자료는 food.js — 이 파일은 그리고 잇기만.
 // 그림판(게임기 gameview와 같은 꼴)은 처음 열 때 만들어 body에 붙인다 — 🏠 집 창(.modal) 위
 import { FRIDGE, ZONE_KO, CAP, foodById, foodTray, slotZone } from './food.js';
-import { houseOf, fridgePutRule, fridgeTakeRule, fridgePlaced } from './house.js';
+import { houseOf, fridgePutRule, fridgeTakeRule, foodDropRule, fridgePlaced } from './house.js';
 import { houseDo, getProfileSnapshot, getPartner, onProfileReload, profileLoading } from './xp.js';
 import { characterUrl, artUrl } from './pokemon.js';
 import { sfx, unlock as sfxUnlock } from './sfx.js';
@@ -18,7 +19,8 @@ const SAY_MS = 1300;
 export const YUM = '맛있겠다!';
 
 // view: 'front' 앞모습 | 'opening' 문 여는 중 | 'inside' 안 · zone: 'cold' | 'frozen' · sel: 고른 음식 id · seq: 열 때마다 올림(닫은 뒤 늦게 끝난 일은 버린다)
-const ui = { box: null, open: false, view: 'front', zone: '', sel: '', busy: false, seq: 0, sayT: 0, lastFocus: null, onClose: null, wired: false };
+// drop: 🗑️ 버리기를 한 번 누른 음식 id(한 번 더 누르면 버린다 — 다른 것을 누르면 풀린다)
+const ui = { box: null, open: false, view: 'front', zone: '', sel: '', drop: '', busy: false, seq: 0, sayT: 0, lastFocus: null, onClose: null, wired: false };
 
 const reduce = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -142,7 +144,7 @@ function nowState() {
 
 /** 앞모습 — 위 작은 문 ❄️ 냉동실 · 아래 큰 문 🥛 냉장실 (방 그림 furnart fridge와 같은 꼴) */
 function drawFront() {
-  ui.view = 'front'; ui.zone = ''; ui.sel = '';
+  ui.view = 'front'; ui.zone = ''; ui.sel = ''; ui.drop = '';
   $q('.fz-title').textContent = '🧊 냉장고';
   $q('.fz-back').hidden = true;
   $q('.fz-tray').hidden = true;
@@ -172,6 +174,7 @@ const slotsOf = (head, n) => Array.from({ length: n }, (_, i) => slotHtml(`${hea
 function drawInside(zone, again) {
   ui.view = 'inside'; ui.zone = zone;
   if (!again) ui.sel = '';
+  ui.drop = ''; // 다시 읽어 그릴 때도 — 「한 번 더!」는 방금 누른 것일 때만
   $q('.fz-title').textContent = zone === 'cold' ? '🥛 냉장실' : '❄️ 냉동실';
   $q('.fz-back').hidden = false;
   const L = FRIDGE[zone];
@@ -210,6 +213,7 @@ function paint(drop) {
   if (profileLoading()) return; // 다시 읽는 중 — 다 읽으면 onProfileReload가 다시 그린다
   const { fridge, tray } = nowState();
   if (ui.sel && !(tray[ui.sel] > 0)) ui.sel = '';
+  if (ui.drop && ui.drop !== ui.sel) ui.drop = '';
   for (const s of stage().querySelectorAll('.fz-slot')) {
     const f = foodById(fridge[s.dataset.k]);
     s.textContent = '';
@@ -256,19 +260,60 @@ function drawTray(tray, fridge) {
     b.addEventListener('click', () => {
       if (ui.busy) return;
       ui.sel = ui.sel === id ? '' : id;
+      ui.drop = '';
       paint();
       say(ui.sel ? `${f.emoji} ${f.ko}${eul(f.ko)} 어디에 넣을까요? 빛나는 칸을 눌러요.` : '음식을 골라요.');
       const again = $q(`.fz-tray-item[data-id="${id}"]`);
       if (again) { try { again.focus({ preventScroll: true }); } catch { /* 옛 브라우저 */ } }
     });
     t.appendChild(b);
+    if (ui.sel === id) t.appendChild(dropBtn(f));
   }
+}
+
+/** 🗑️ 버리기를 처음 눌렀을 때 묻는 말 (순수) — 무엇을 버리는지 이름으로 · 💰는 돌아오지 않는다고 */
+export const dropAskLine = (f) => `${f.emoji} ${f.ko}${eul(f.ko)} 버릴까요? 한 번 더 누르면 1개를 버려요 — 💰는 돌아오지 않아요.`;
+/** 🗑️ 버린 뒤의 말 (순수) */
+export const dropDoneLine = (f) => `${f.emoji} ${f.ko} 1개를 버렸어요.`;
+
+/** 🗑️ 고른 음식 버리기 단추 (v443) — 고른 음식 바로 옆 · 한 번 누르면 「한 번 더!」(마트의 사기와 같은 꼴) */
+function dropBtn(f) {
+  const armed = ui.drop === f.id;
+  const d = el('button', `fz-drop${armed ? ' is-arm' : ''}`, armed ? '한 번 더!' : '🗑️ 버리기');
+  d.type = 'button';
+  d.setAttribute('aria-label', armed ? `${f.ko} 1개 버리기 — 한 번 더 누르면 버려요` : `${f.ko} 버리기`);
+  d.addEventListener('click', () => onDrop(f.id));
+  return d;
+}
+
+/** 🗑️ 버리기 누르기 — 처음엔 묻기만 · 한 번 더 누르면 🧺에서 1개를 버린다(저장된 프로필로 한 트랜잭션 · 그 뒤 저장된 것으로 다시 그림) */
+async function onDrop(id) {
+  if (ui.busy || ui.view !== 'inside' || profileLoading()) return;
+  const f = foodById(id);
+  if (!f || ui.sel !== id) return;
+  if (ui.drop !== id) {
+    ui.drop = id;
+    paint();
+    say(dropAskLine(f));
+    focusOn('.fz-drop');
+    return;
+  }
+  const seq = ui.seq;
+  ui.drop = '';
+  ui.busy = true;
+  let r = null;
+  try { r = await houseDo((p) => foodDropRule(p, id)); } catch { r = null; } finally { if (ui.seq === seq) ui.busy = false; }
+  if (!ui.open || ui.seq !== seq || ui.view !== 'inside') return;
+  paint();
+  say(r && r.ok ? dropDoneLine(f) : FRIDGE_WHY[r && r.why] || FRIDGE_WHY.save);
+  focusOn(`.fz-tray-item[data-id="${id}"]`); // 남았으면 그 음식으로 · 다 버렸으면 그대로
 }
 
 /** 칸 누르기 — 음식이 있으면 꺼내기 · 비었으면 고른 음식 넣기 (저장된 프로필로 한 트랜잭션 · 그 뒤 저장된 것으로 다시 그림) */
 async function onSlot(s) {
   if (ui.busy || ui.view !== 'inside' || profileLoading()) return;
   sfxUnlock();
+  ui.drop = '';
   const k = s.dataset.k;
   const { fridge } = nowState();
   const had = foodById(fridge[k]);

@@ -34,16 +34,20 @@ export function stemWord(word, known) {
   if (w.endsWith('ier')) push(w.slice(0, -3) + 'y');
   if (w.endsWith('iest')) push(w.slice(0, -4) + 'y');
   if (w.endsWith('sses') || w.endsWith('shes') || w.endsWith('ches') || w.endsWith('xes') || w.endsWith('zes')) push(w.slice(0, -2));
-  if (w.endsWith('es')) push(w.slice(0, -2)), push(w.slice(0, -1));
+  // ★ 꼬리를 덜 뗀 꼴(e가 남는 꼴) 먼저 (v443) — 짧은 꼴부터 보면 scares → scar(흉터) · hates → hat(모자) · cared → car 처럼
+  //    다른 낱말이 걸려 틀린 뜻이 뜨거나(기초 낱말이면) 맞는 뜻이 가려졌다 (11-26 점검 · 태블릿 영상 문장으로 대조)
+  if (w.endsWith('es')) push(w.slice(0, -1)), push(w.slice(0, -2)); // scares → scare · potatoes → potato
   if (w.endsWith('s') && !w.endsWith('ss')) push(w.slice(0, -1));
   if (w.endsWith('ed')) {
-    push(w.slice(0, -2));
-    push(w.slice(0, -1));                                  // loved → love
+    push(w.slice(0, -1));                                  // loved → love · cared → care
+    push(w.slice(0, -2));                                  // played → play
     if (/([b-df-hj-np-tv-z])\1ed$/.test(w)) push(w.slice(0, -3)); // stopped → stop
   }
   if (w.endsWith('ing')) {
-    push(w.slice(0, -3));
-    push(w.slice(0, -3) + 'e');                            // solving → solve
+    const base = w.slice(0, -3);
+    // 짧은 꼴이 (자음+)모음+자음으로 끝날 때만 e를 붙인 꼴 먼저(hoping → hope · using → use · hopping은 아래 겹자음 줄에서 hop) — 늘 e 먼저면 being → bee · suiting → suite
+    if (/(?:^|[b-df-hj-np-tv-z])[aeiou][b-df-hj-np-tv-z]$/.test(base)) push(base + 'e'), push(base); // hoping → hope
+    else push(base), push(base + 'e');                     // seeing → see · solving → solve(solv는 없는 말이라 다음 꼴로)
     if (/([b-df-hj-np-tv-z])\1ing$/.test(w)) push(w.slice(0, -4)); // running → run
   }
   if (w.endsWith('er')) push(w.slice(0, -2)), push(w.slice(0, -1));   // bigger→bigg(x)→..., nicer → nice

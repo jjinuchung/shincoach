@@ -58,9 +58,16 @@ const STAT_STORES = ['sentenceStats', 'sessions', 'daily', 'vocabViews', 'profil
 
 let dbPromise = null;
 
+/**
+ * 저장소 연결 — 약속 하나를 돌려 쓴다.
+ * 열기가 실패하거나(onerror) 연결이 저절로 끊기면(onclose — 브라우저가 닫음) 약속을 비워 **다음 호출이 다시 연다** (v443 · 11-26 점검).
+ * 예전엔 그 거절·닫힌 연결을 앱을 다시 켤 때까지 돌려줘, 그 창은 아무것도 저장하지 못했다(화면에는 💰·포켓몬이 늘어 보이다가 닫을 때 사라진다 ·
+ * 앱으로 돌아올 때의 reloadProfile도 같은 약속이라 못 고쳤다). 다시 열리면 미뤄 둔 저장(프로필 증분·문장 기록·⏳ 초)은 다음 flush가 싣는다.
+ * 비우는 것은 **내가 만든 약속일 때만**(mine) — 늦게 온 닫힘 알림이 그새 새로 연 연결을 지우지 않게.
+ */
 function openDb() {
   if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
+  const mine = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
     req.onupgradeneeded = () => {
       const db = req.result;
@@ -100,11 +107,16 @@ function openDb() {
       const db = req.result;
       // 새 버전 앱이 열리면 이 연결은 스스로 닫아서 업그레이드를 막지 않음
       db.onversionchange = () => { db.close(); dbPromise = null; window.dispatchEvent(new CustomEvent('shincoach:dbversionchange')); };
+      // 연결이 저절로 끊김(db.close()를 부른 것이 아니라 브라우저가 닫음) → 다음 호출이 다시 연다
+      db.onclose = () => { if (dbPromise === mine) dbPromise = null; };
       resolve(db);
     };
-    req.onerror = () => reject(req.error);
+    req.onerror = () => { if (dbPromise === mine) dbPromise = null; reject(req.error); };
   });
-  return dbPromise;
+  dbPromise = mine;
+  // indexedDB.open()이 그 자리에서 던질 때도(SecurityError 등 — onerror를 안 거친다) 거절을 붙들지 않는다 (Codex 252차 #4)
+  mine.catch(() => { if (dbPromise === mine) dbPromise = null; });
+  return mine;
 }
 
 /** 트랜잭션 요청을 Promise로 감싸기 */
@@ -182,6 +194,8 @@ export async function listItems() {
       const item = await promisify(db.transaction('items', 'readonly').objectStore('items').get(id));
       if (item) out.push(item);
     } catch (err) {
+      // 읽는 도중 연결이 끊긴 것은 「깨진 영상」이 아니다 — 깨짐으로 적으면 화면이 🗑로 지우라고 하고, 다시 열린 연결(v443)로 멀쩡한 영상이 진짜 지워진다
+      if (err && (err.name === 'InvalidStateError' || err.name === 'AbortError')) throw err;
       console.warn('영상 정보를 읽지 못했어요:', id, err);
       broken = true;
       out.push({

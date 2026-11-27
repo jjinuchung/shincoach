@@ -74,6 +74,19 @@ const TYPOS = {
   liek: 'like', brohter: 'brother', familiy: 'family', playd: 'played',
 };
 
+/**
+ * 단어장에 없는 **진짜 영어 낱말**인데 붙은 두 글자를 바꾸면 단어장 낱말이 되는 것 — 고치지 않는다 (v443 · 아버님 「potion을 option으로 바꾸는 것」)
+ * 예전엔 potion → option · trial → trail · cures → curse · angle → angel 처럼 맞게 쓴 말을 「철자를 고쳤어요」로 바꿨다.
+ * 고른 법: 영화 자막 빈도 목록 5만 낱말을 앱 단어장으로 훑어(tools/typo_sweep.mjs) 바뀌는 낱말 가운데 **바뀔 낱말의 1/20 이상 자주 쓰이는** 영어 낱말·
+ *   영어 이름(아이가 소문자로 친 Gary · Brian · Marnie) — 그보다 드물면 아이 글에선 바꿔 쓴 실수일 가능성이 커서 예전처럼 고친다(dose → does ·
+ *   alter → later · prefect → perfect · barley → barely). 외국어·줄임 조각(hadn · tron · popo)은 넣지 않는다(치면 실수다).
+ * 단어장에 낱말을 더하면 새로 부딪히는 짝이 생길 수 있다 — 그때 tools/typo_sweep.mjs로 다시 훑는다
+ */
+export const NOT_TYPO = new Set([
+  'cane', 'anna', 'patsy', 'trial', 'gary', 'unite', 'apologise', 'crud', 'crave', 'theatre', 'kilometre', 'blam', 'perp', 'brian', 'rouge', 'frat', 'fibre', 'latitude',
+  'angle', 'mantel', 'drat', 'potion', 'corp', 'nobel', 'marnie', 'bran', 'crepe', 'arise', 'veil', 'feats', 'cures', 'louts', 'lira', 'arid', 'amid', 'abby',
+]);
+
 /** 같은 단어를 두 번 쓴 것을 지울 수 있는 말 — 강조("very very happy")는 아이가 일부러 쓴 것이라 건드리지 않는다 */
 const DEDUP_OK = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'on', 'at', 'and', 'is', 'my', 'it']);
 
@@ -190,8 +203,19 @@ export function correct(keep, written, opts = {}) {
     }
 
     // ③ a / an — **소리를 아는 경우만**. u로 시작하는 말은 a useful / an umbrella 가 갈려서 건드리지 않는다
+    //    글자 이름 A(an A on the test · team A · vitamin A)는 관사가 아니다 — 문장 가운데의 대문자 A는 건드리지 않는다. 예전엔
+    //    「an A on the test」가 「An on the test」가 됐다 (v443). 아이가 쓴 첫 낱말(i === keepLen)·문장 첫 낱말의 A는 관사로 본다 —
+    //    다만 바로 앞이 관사면(틀이 「…an」에서 끝나고 아이가 「A on the test」를 씀) 글자 이름이다 (Codex 252차 #1)
     if (mine && (lower === 'a' || lower === 'an')) {
-      const next = toks[i + 1] && toks[i + 1].word ? toks[i + 1].word.toLowerCase() : '';
+      const prev = i > 0 ? toks[i - 1] : null;
+      const inSentence = !!prev && !/[.!?]/.test(prev.post);
+      const afterArticle = inSentence && !prev.post && /^an?$/i.test(prev.word || '');
+      if (t.word === 'A' && inSentence && (i > keepLen || afterArticle)) { t.letter = true; continue; } // letter — ⑤가 「A a」를 겹친 말로 지우지 않게
+      // 겹쳐 친 같은 관사(a a dog · an an dog)는 그 뒤 낱말로 판정한다 — 예전엔 뒤의 관사를 「모음으로 시작하는 말」로 읽어 「an a dog」가 됐다(겹침은 ⑤가 지운다)
+      let j = i + 1;
+      while (toks[j] && toks[j].word === lower) j += 1;
+      // 다음 낱말은 **쓴 그대로** 넘긴다 — 모두 대문자인 약어(an NBA player)를 가리려면 크고 작은 글자가 필요하다 (v443)
+      const next = toks[j] && toks[j].word ? toks[j].word : '';
       const want = articleFor(next);
       if (want && want !== lower) {
         const to = matchCase(t.word, want);
@@ -220,7 +244,7 @@ export function correct(keep, written, opts = {}) {
   for (let i = toks.length - 1; i > Math.max(0, keepLen - 1); i--) {
     const a = toks[i].word ? toks[i].word.toLowerCase() : '';
     const b = toks[i - 1].word ? toks[i - 1].word.toLowerCase() : '';
-    if (a && a === b && DEDUP_OK.has(a) && !toks[i - 1].post) {
+    if (a && a === b && DEDUP_OK.has(a) && !toks[i - 1].post && !toks[i].letter && !toks[i - 1].letter) { // 글자 이름 A + 관사 a(an A a week ago)는 겹친 말이 아니다 (v443)
       notes.push({ from: `${toks[i - 1].word} ${toks[i].word}`, to: toks[i].word, why: '같은 단어가 두 번 들어갔어요' });
       toks.splice(i - 1, 1);
     }
@@ -257,7 +281,7 @@ function typoFix(lower, known) {
   if (known.has(lower)) return null;          // 사전에 있는 말은 맞게 쓴 것
   if (isInflection(lower, known)) return null; // ducks · cakes · played 처럼 아는 단어의 변화형도 맞는 말
   if (TYPOS[lower]) return TYPOS[lower];
-  if (lower.length < 4) return null;
+  if (lower.length < 4 || NOT_TYPO.has(lower)) return null; // 진짜 낱말(potion · trial) — 아래 두 글자 바꾸기로 다른 낱말이 되지 않게 (v443)
   // 붙어 있는 두 글자를 바꿔 쓴 것 (freind → friend) — 실수가 분명한 경우만
   for (let i = 0; i + 1 < lower.length; i++) {
     if (lower[i] === lower[i + 1]) continue;
@@ -277,11 +301,19 @@ function isInflection(lower, known) {
 /**
  * 이 말 앞에 와야 하는 관사. **확실할 때만** 돌려준다(모르면 null → 아이가 쓴 그대로).
  * u로 시작하는 말은 a useful · an umbrella 로 갈려서 글자만 보고 판단할 수 없다.
+ * 글자 이름으로 읽는 말도 그렇다 (v443 · 11-26 점검) — an NBA player · an MVP · an X item · an x-ray 는 맞는 글인데 첫 글자만 보고
+ * a 로 바꾸고 「자음 소리로 시작하는 말 앞에는 a」라고 틀린 까닭까지 붙였다. a European · a ewe 는 거꾸로(철자는 모음, 소리는 자음).
+ * @param {string} raw 다음 낱말 — **쓴 그대로**(크고 작은 글자가 약어를 가른다)
  */
-function articleFor(next) {
+function articleFor(raw) {
+  const next = String(raw || '').toLowerCase();
   if (!next || !/^[a-z]/.test(next)) return null;
   if (VOWEL_EXCEPT.has(next)) return 'an';
   if (/^(one|ones|once)\b/.test(next)) return null; // a one-dollar toy — 철자는 모음이어도 소리는 자음 (v394)
+  if (/\d/.test(next)) return null;                        // an M4A1 · an N64 — 숫자가 섞이면 글자 이름으로 읽는다
+  if (/^[A-Z]{2,}$/.test(String(raw))) return null;         // an NBA player · an MVP · a NASA team — 모두 대문자면 약어일 수 있다
+  if (!/[aeiouy]/.test(next)) return null;                 // an mvp · an X item · an S rank · an x-ray(낱말 칸은 x까지) — 모음 글자가 없으면 글자 이름(a tv)
+  if (/^(eu|ew|x)/.test(next)) return null;                // a European city · a ewe · an Xbox
   const c = next[0];
   if (c === 'u' || c === 'h' || c === 'y') return null;  // useful/hour/year — 소리를 장담할 수 없다
   if ('aeio'.includes(c)) return 'an';

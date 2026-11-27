@@ -159,7 +159,7 @@ test('⏰📚 화면 배선 — ☀️는 고른 줄기로 옮겨 연다 · 🌳
   const sd = src.slice(src.indexOf("function startDaily(from = 'ladder') {"), src.indexOf('\n}\n', src.indexOf("function startDaily(from = 'ladder') {"))); // v331 — 누른 곳(from)을 받는다
   assert.ok(sd.indexOf('ui.stem = plan.roundStem') > 0 && sd.indexOf('ui.stem = plan.roundStem') < sd.indexOf('startRound(plan.roundId'), '편을 열기 전에 줄기부터 옮긴다(G가 그 줄기 것)');
   const pk = src.slice(src.indexOf('function renderStemPicker(state) {'), src.indexOf('\n}\n', src.indexOf('function renderStemPicker(state) {')));
-  assert.ok(pk.includes('for (const key of stemPickOrder(state, today))') && pk.includes("b.addEventListener('click', () => openStem(state, key));"));
+  assert.ok(pk.includes('for (const key of stemPickOrder(state, today))') && pk.includes("b.addEventListener('click', () => openStem(ui.state || state, key));")); // v443 — 고르는 사이 뒤에서 붙은 📬 답장이 보이게 지금 기록으로
   // v260 아버님: 🌳 화면에 얼마나 했고·남았고·며칠 밀렸는지 쓰지 않는다(압박) — 차례만 밀린 줄기가 위
   assert.ok(!/stemDueList|개를 알아요|다시 확인 \$\{|일 지난|기다려요|오늘 차례/.test(pk), '🌳 화면에 셈·밀린 날 말이 없다');
   const fin = src.slice(src.indexOf('lucky = luckyCatch(s, {'), src.indexOf('} catch (err) {', src.indexOf('lucky = luckyCatch(s, {')));

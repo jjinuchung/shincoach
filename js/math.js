@@ -575,7 +575,6 @@ export async function renderMath() {
   m.appendChild(el('p', 'math-loading', '불러오는 중…'));
   await settleMathThrows().catch(() => {}); // 🎯 남은 예약을 먼저 돌려줘야 사다리의 "받은 몬스터볼" 수가 맞다
   let [state] = await Promise.all([getMath(), buildOpts()]);
-  state = await syncMathReplies(state); // 📬 비공개 저장소의 아빠 답장이 있으면 붙인다
   state = await settleLive(state); // ⏹ 앱을 닫아 못 끝낸 개념 편 → 그만둠 (v250)
   state = await ensureRest(state); // 🌱 학교 진도 먼저 — 설정이 없으면 한 번 켠다 (v301)
   if (run !== ui.run) return; // 그 사이에 다른 화면으로 갔다
@@ -586,6 +585,7 @@ export async function renderMath() {
   else if (needsPlacement(state, ui.stem)) renderDiagIntro();
   else renderLadder(state);
   resumeRocketIfAny(); // 🚀 끝나지 않은 로켓단 배틀
+  syncRepliesLater(); // 📬 아빠 답장은 사다리를 그린 뒤 뒤에서 — 기다리지 않는다 (v443)
 }
 
 /**
@@ -619,7 +619,8 @@ function renderStemPicker(state) {
     // 줄기가 제 소개(pick)를 가지면 그것 — 소수는 앞 다섯 칸이 학교 진도라 "처음 배우는 줄기"가 맞지 않다
     body.appendChild(el('span', 'math-stem-sub', started ? '하던 줄기 — 이어서 해요' : (st.pick || (st.lesson ? '처음 배우는 줄기 — 한 장씩 배우고 문제를 풀어요' : '📏 진단 5문제로 시작해요'))));
     b.appendChild(body);
-    b.addEventListener('click', () => openStem(state, key));
+    // 고르는 사이 뒤에서 붙은 📬 답장·돌려받은 몬스터볼이 사다리에 보이게 — 그릴 때의 기록이 아니라 지금 기록으로 (v443)
+    b.addEventListener('click', () => openStem(ui.state || state, key));
     list.appendChild(b);
   }
   card.appendChild(list);
@@ -1321,6 +1322,9 @@ function startNotesRound(list) {
  * 흐름은 ui.daily에, 편은 평소처럼 ui.round에 — 🎒 다녀와도 편이 복원되고 흐름도 남는다. 사다리로 나가면 흐름은 끝.
  */
 function startDaily(from = 'ladder') {
+  // 📬 읽어야 ☀️가 열린다(아버님 결정 2026-09-21) — 답장을 뒤에서 받게 된 뒤(v443)로는 먼저 그려 둔 ☀️ 단추(🧩·🕵️ 끝 화면 · 낡은 사다리)가
+  //    그 사이 붙은 답장을 모른다 → 누른 순간 한 번 더 보고, 안 읽은 답장이 있으면 사다리(📬 단추)로 (Codex 252차 #2)
+  if (unreadAsks(ui.state).length) { renderLadder(ui.state); return; }
   const today = todayKey();
   const seed = (Date.now() % 1000000) | 0;
   const plan = dailyPlan(ui.state, today, ui.stem, seed);
@@ -2269,6 +2273,24 @@ async function syncMathReplies(state) {
   const todo = list.filter((e) => e && applyReply(probe, e.no, e.text));
   if (!todo.length) return state;
   try { return await updateMath((m) => { for (const e of todo) applyReply(m, e.no, e.text); }); } catch { return state; }
+}
+
+/**
+ * 📬 아빠 답장은 사다리를 그린 뒤 뒤에서 받는다 (v443 · 11-26 점검) — 영어 교정·국어·논술 답장과 같은 꼴.
+ * 예전엔 renderMath가 이 받기(인터넷 왕복 · 시간 제한 없음)를 기다린 뒤에야 사다리를 그려, 와이파이는 붙었는데 인터넷이 먹통이면
+ * 기기 안에 다 있는 수학이 「불러오는 중…」에서 멈췄다(들어올 때마다 · 🎒·📊를 다녀올 때도).
+ * 새 답장이 붙었을 때만(저장된 최신 기록이 돌아온다) ui.state를 바꾸고 사다리가 떠 있으면 다시 그린다 — 못 받았거나 새것이 없으면
+ * 아무것도 안 한다(받는 사이 다른 저장이 바꾼 ui.state를 낡은 기록으로 덮지 않게). 받는 중에 또 불리면 겹쳐 받지 않는다.
+ */
+let replySync = null;
+function syncRepliesLater() {
+  if (replySync || !ui.state) return replySync || undefined;
+  const from = ui.state;
+  replySync = syncMathReplies(from)
+    .then((next) => { if (next && next !== from) { ui.state = next; refreshLadderIfShown(); } })
+    .catch(() => {})
+    .finally(() => { replySync = null; });
+  return replySync;
 }
 
 /** 📬 답장 화면 — 문맥(문제·내 답·정답·내 한마디) + 💬 아빠 답장(그림 지시문 가능) → 😄 이해했어요 / 😶 아직 모르겠어요 */
